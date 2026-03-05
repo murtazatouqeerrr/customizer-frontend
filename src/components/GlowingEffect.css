@@ -1,0 +1,83 @@
+.glowing-effect-border {
+  pointer-events: none;
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  opacity: 0;
+  transition: opacity 0.3s;
+  display: none;
+}
+
+.glowing-effect-border.show-border {
+  display: block;
+}
+
+.glowing-effect-container {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 1;
+  transition: opacity 0.3s;
+}
+
+.glowing-effect-container.glow-visible {
+  opacity: 1;
+}
+
+.glowing-effect-container.blur-effect {
+  filter: blur(var(--blur));
+}
+
+.glowing-effect-container.hide-glow {
+  display: none;
+}
+
+.glow {
+  border-radius: inherit;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.glow::after {
+  content: "";
+  border-radius: inherit;
+  position: absolute;
+  inset: calc(-1 * var(--glowingeffect-border-width));
+  border: var(--glowingeffect-border-width) solid transparent;
+  background: radial-gradient(circle, #dd7bbb 10%, #dd7bbb00 20%),
+    radial-gradient(circle at 40% 40%, #d79f1e 5%, #d79f1e00 15%),
+    radial-gradient(circle at 60% 60%, #5a922c 10%, #5a922c00 20%),
+    radial-gradient(circle at 40% 60%, #4c7894 10%, #4c789400 20%),
+    repeating-conic-gradient(
+      from 236.84deg at 50% 50%,
+      #dd7bbb 0%,
+      #d79f1e 5%,
+      #5a922c 10%,
+      #4c7894 15%,
+      #dd7bbb 20%
+    );
+  background-attachment: fixed;
+  opacity: var(--active);
+  transition: opacity 0.3s;
+  -webkit-mask-clip: padding-box, border-box;
+  mask-clip: padding-box, border-box;
+  -webkit-mask-composite: intersect;
+  mask-composite: intersect;
+  -webkit-mask-image: linear-gradient(transparent, transparent),
+    conic-gradient(
+      from calc((var(--start) - var(--spread)) * 1deg),
+      transparent 0deg,
+      white,
+      transparent calc(var(--spread) * 2deg)
+    );
+  mask-image: linear-gradient(transparent, transparent),
+    conic-gradient(
+      from calc((var(--start) - var(--spread)) * 1deg),
+      transparent 0deg,
+      white,
+      transparent calc(var(--spread) * 2deg)
+    );
+}

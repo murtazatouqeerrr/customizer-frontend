@@ -1,0 +1,177 @@
+.moq-demo {
+  min-height: 100vh;
+  background: #f8f9fa;
+  padding: 24px;
+}
+
+.demo-header {
+  text-align: center;
+  margin-bottom: 32px;
+  padding: 32px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.demo-header h1 {
+  margin: 0 0 12px 0;
+  color: #1f2937;
+  font-size: 2rem;
+}
+
+.demo-header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 1.125rem;
+}
+
+.demo-content {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.demo-left {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.product-selector {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.product-selector h3 {
+  margin: 0 0 12px 0;
+  color: #1f2937;
+  font-size: 1.125rem;
+}
+
+.product-selector select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #1f2937;
+  background: white;
+  cursor: pointer;
+}
+
+.product-selector select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.demo-right {
+  position: relative;
+}
+
+.sticky-panel {
+  position: sticky;
+  top: 24px;
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.sticky-panel h3 {
+  margin: 0 0 20px 0;
+  color: #1f2937;
+  font-size: 1.25rem;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 0.875rem;
+}
+
+.summary-item span {
+  color: #6b7280;
+}
+
+.summary-item strong {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.selections-summary {
+  margin: 24px 0;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.selections-summary h4 {
+  margin: 0 0 12px 0;
+  color: #1f2937;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.selections-summary ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.selections-summary li {
+  padding: 6px 0;
+  color: #6b7280;
+  font-size: 0.813rem;
+}
+
+.selections-summary li strong {
+  color: #3b82f6;
+  text-transform: capitalize;
+}
+
+.checkout-btn {
+  width: 100%;
+  padding: 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 24px;
+}
+
+.checkout-btn:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.checkout-btn:disabled {
+  cursor: not-allowed;
+  background: #9ca3af;
+}
+
+@media (max-width: 1024px) {
+  .demo-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .sticky-panel {
+    position: relative;
+    top: 0;
+  }
+}
