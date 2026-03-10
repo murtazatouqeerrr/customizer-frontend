@@ -1,102 +1,73 @@
 import React, { useState } from 'react';
-import LandingPage from './components/LandingPage';
-import CategorySelection from './components/CategorySelection';
-import ModelSelection from './components/ModelSelection';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import AdminDashboard from './components/AdminDashboard';
+import UserDashboard from './components/UserDashboard';
+import UserCustomizer from './components/UserCustomizer';
 import ProductConfigurator from './components/ProductConfigurator';
 import Preview from './components/Preview';
 import Checkout from './components/Checkout';
 import './App.css';
 
-function App() {
-  // Flow: landing → category → models → configurator → preview → checkout
-  const [step, setStep] = useState('landing');
-  const [selectedCategory, setSelectedCategory] = useState(null);
+// --- User flow wrapper ---
+function UserApp() {
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [selections, setSelections] = useState({});
-  const [quantity, setQuantity] = useState(1);
+  const [orderReview, setOrderReview] = useState(null);
+  const [orderCheckout, setOrderCheckout] = useState(null);
 
-  const handleStartCustomizing = () => {
-    setStep('category');
-  };
+  if (orderCheckout) {
+    return (
+      <Checkout
+        product={orderCheckout.product}
+        selections={orderCheckout.selections}
+        quantity={orderCheckout.quantity}
+        onBack={() => setOrderCheckout(null)}
+        onComplete={() => {
+          setOrderCheckout(null);
+          setOrderReview(null);
+          setSelectedProduct(null);
+        }}
+      />
+    );
+  }
 
-  const handleSelectCategory = (categoryId) => {
-    setSelectedCategory(categoryId);
-    setStep('models');
-  };
+  if (orderReview) {
+    return (
+      <Preview
+        product={orderReview.product}
+        selections={orderReview.selections}
+        quantity={orderReview.quantity}
+        onCheckout={() => setOrderCheckout(orderReview)}
+        onBack={() => setOrderReview(null)}
+      />
+    );
+  }
 
-  const handleSelectModel = (product) => {
-    setSelectedProduct(product);
-    setStep('configurator');
-  };
+  if (selectedProduct) {
+    return (
+      <ProductConfigurator
+        product={selectedProduct}
+        onBack={() => setSelectedProduct(null)}
+        onNext={(selections, quantity) => setOrderReview({ product: selectedProduct, selections, quantity })}
+        isAdmin={false}
+      />
+    );
+  }
 
-  const handleConfiguratorNext = (sel, qty) => {
-    setSelections(sel);
-    setQuantity(qty);
-    setStep('preview');
-  };
+  return <UserDashboard onSelectProduct={setSelectedProduct} />;
+}
 
-  const handleCheckout = () => {
-    setStep('checkout');
-  };
-
-  const handleOrderComplete = () => {
-    // Reset everything
-    setStep('landing');
-    setSelectedCategory(null);
-    setSelectedProduct(null);
-    setSelections({});
-    setQuantity(1);
-  };
-
+// --- Main App with routing ---
+function App() {
   return (
-    <div className="app">
-      {step === 'landing' && (
-        <LandingPage onStart={handleStartCustomizing} />
-      )}
+    <BrowserRouter>
+      <Routes>
+        {/* Admin dashboard */}
+        <Route path="/admin/*" element={<AdminDashboard />} />
 
-      {step === 'category' && (
-        <CategorySelection
-          onSelectCategory={handleSelectCategory}
-          onBack={() => setStep('landing')}
-        />
-      )}
-
-      {step === 'models' && (
-        <ModelSelection
-          category={selectedCategory}
-          onSelectModel={handleSelectModel}
-          onBack={() => setStep('category')}
-        />
-      )}
-
-      {step === 'configurator' && selectedProduct && (
-        <ProductConfigurator
-          product={selectedProduct}
-          onNext={handleConfiguratorNext}
-          onBack={() => setStep('models')}
-        />
-      )}
-
-      {step === 'preview' && selectedProduct && (
-        <Preview
-          product={selectedProduct}
-          selections={selections}
-          quantity={quantity}
-          onCheckout={handleCheckout}
-          onBack={() => setStep('configurator')}
-        />
-      )}
-
-      {step === 'checkout' && (
-        <Checkout
-          product={selectedProduct}
-          selections={selections}
-          quantity={quantity}
-          onBack={() => setStep('preview')}
-          onComplete={handleOrderComplete}
-        />
-      )}
-    </div>
+        {/* User-facing storefront */}
+        <Route path="/*" element={<UserApp />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

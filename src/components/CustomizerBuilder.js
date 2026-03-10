@@ -9,14 +9,14 @@ import MOQValidator from './MOQValidator';
 import { SCENTED_CANDLES, calculateTotalMOQ } from '../data/productData';
 import './CustomizerBuilder.css';
 
-const API_URL = 'https://cusstomizer-backend-production.up.railway.app/api';
+const API_URL = 'https://customizer-backend-lxfe.onrender.com/api';
 
 function CanvasImage({ src, x = 0, y = 0, width = 350, height = 450 }) {
   const [image] = useImage(src);
   return image ? <KonvaImage image={image} x={x} y={y} width={width} height={height} /> : null;
 }
 
-function CustomizerBuilder({ model, onNext, onBack }) {
+function CustomizerBuilder({ model, onNext, onBack, isAdmin }) {
   const [elements, setElements] = useState([]);
   const [selectedElement, setSelectedElement] = useState(null);
   const [showAddElement, setShowAddElement] = useState(false);
@@ -28,6 +28,8 @@ function CustomizerBuilder({ model, onNext, onBack }) {
   const [livePreview, setLivePreview] = useState(true);
   const [userSelections, setUserSelections] = useState({});
   const [currentMOQ, setCurrentMOQ] = useState(1);
+  const [isPublished, setIsPublished] = useState(model.is_published || false);
+  const [publishLoading, setPublishLoading] = useState(false);
   const transformerRef = useRef(null);
   const boxRef = useRef(null);
 
@@ -174,6 +176,37 @@ function CustomizerBuilder({ model, onNext, onBack }) {
     }
   };
 
+  const handleTogglePublish = async () => {
+    setPublishLoading(true);
+    try {
+      const res = await axios.put(`${API_URL}/models/${model.id}/publish`);
+      setIsPublished(res.data.is_published);
+    } catch (err) {
+      console.error('Error toggling publish:', err);
+      alert('Error updating publish status');
+    } finally {
+      setPublishLoading(false);
+    }
+  };
+
+  const handleToggleElementEnable = async (elementId, currentEnabled) => {
+    try {
+      const res = await axios.put(`${API_URL}/elements/${elementId}/enable`);
+      setElements(prev => prev.map(e =>
+        e.id === elementId ? { ...e, is_enabled: res.data.is_enabled } : e
+      ));
+      setSelectedElement(prev =>
+        prev?.id === elementId ? { ...prev, is_enabled: res.data.is_enabled } : prev
+      );
+    } catch (err) {
+      console.error('Error toggling element enable:', err);
+      // For custom (non-DB) elements, just toggle locally
+      setElements(prev => prev.map(e =>
+        e.id === elementId ? { ...e, is_enabled: !currentEnabled } : e
+      ));
+    }
+  };
+
   const handleAddCustomizationBox = () => {
     const newBox = {
       id: Date.now(),
@@ -234,8 +267,44 @@ function CustomizerBuilder({ model, onNext, onBack }) {
           <button className="header-menu">⋯</button>
         </div>
         <div className="header-right">
+          <span
+            className="publish-status-badge"
+            style={{
+              background: isPublished ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.07)',
+              color: isPublished ? '#10b981' : '#94a3b8',
+              border: isPublished ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.12)',
+              padding: '5px 12px',
+              borderRadius: '20px',
+              fontSize: '0.75rem',
+              fontWeight: '600'
+            }}
+          >
+            {isPublished ? '✓ Published' : '○ Draft'}
+          </span>
+          <button
+            onClick={handleTogglePublish}
+            disabled={publishLoading}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: 'none',
+              fontWeight: '600',
+              fontSize: '0.82rem',
+              cursor: publishLoading ? 'wait' : 'pointer',
+              background: isPublished
+                ? 'rgba(239,68,68,0.15)'
+                : 'linear-gradient(135deg,#10b981,#059669)',
+              color: isPublished ? '#f87171' : 'white',
+              borderWidth: isPublished ? '1px' : '0',
+              borderStyle: 'solid',
+              borderColor: isPublished ? 'rgba(239,68,68,0.3)' : 'transparent',
+              transition: 'all 0.2s'
+            }}
+          >
+            {publishLoading ? '...' : isPublished ? '⬇ Unpublish' : '⬆ Publish'}
+          </button>
           <button className="settings-btn" onClick={handleSaveAll}>
-            ⚙️ General settings
+            ⚙️ Save
           </button>
         </div>
       </div>
@@ -297,6 +366,35 @@ function CustomizerBuilder({ model, onNext, onBack }) {
                 </div>
                 {expandedSections[index] && (
                   <div className="accordion-content">
+                    {/* Enable for users toggle */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '8px 12px',
+                        background: 'rgba(255,255,255,0.03)',
+                        borderRadius: '8px',
+                        marginBottom: '8px',
+                        border: '1px solid rgba(255,255,255,0.06)'
+                      }}
+                    >
+                      <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: '500' }}>
+                        👁 Visible to users
+                      </span>
+                      <label
+                        className="toggle-switch"
+                        onClick={e => e.stopPropagation()}
+                        style={{ transform: 'scale(0.85)' }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={element.is_enabled !== false}
+                          onChange={() => handleToggleElementEnable(element.id, element.is_enabled !== false)}
+                        />
+                        <span className="toggle-slider"></span>
+                      </label>
+                    </div>
                     <div
                       className={`element-item ${selectedElement?.id === element.id ? 'active' : ''}`}
                       onClick={() => setSelectedElement(element)}
@@ -343,26 +441,30 @@ function CustomizerBuilder({ model, onNext, onBack }) {
                 <>
                   <CanvasImage src={baseImage} />
 
-                  {/* Customization box overlay */}
+                  {/* Render Elements that can be positioned */}
                   {elements.map(element => {
-                    if (element.type !== 'customization-box' || !element.config) return null;
+                    const isPositional = ['customization-box', 'text', 'textarea', 'text-placeholder', 'upload', 'image-placeholder', 'color-choices', 'image-choices'].includes(element.type);
+                    if (!isPositional || !element.config) return null;
 
                     const boxX = element.config.boxX || 50;
                     const boxY = element.config.boxY || 50;
-                    const boxWidth = element.config.boxWidth || 200;
-                    const boxHeight = element.config.boxShape === 'square' ? boxWidth : (element.config.boxHeight || 200);
+                    const boxWidth = element.config.boxWidth || (element.type === 'color-choices' ? 200 : 150);
+                    const boxHeight = element.config.boxShape === 'square' ? boxWidth : (element.config.boxHeight || (element.type === 'color-choices' ? 200 : 50));
+
+                    const isSelected = selectedElement?.id === element.id;
 
                     return (
                       <React.Fragment key={element.id}>
                         <Rect
-                          ref={selectedElement?.id === element.id ? boxRef : null}
+                          ref={isSelected ? boxRef : null}
                           x={boxX}
                           y={boxY}
                           width={boxWidth}
                           height={boxHeight}
-                          fill={getBoxColor()}
-                          stroke={selectedElement?.id === element.id ? '#667eea' : '#333'}
-                          strokeWidth={selectedElement?.id === element.id ? 3 : 2}
+                          fill={element.type === 'color-choices' ? getBoxColor() : 'rgba(255,255,255,0.0)'}
+                          stroke={isSelected ? '#667eea' : '#ccc'}
+                          strokeWidth={isSelected ? 3 : 1}
+                          strokeDasharray={isSelected ? [] : [5, 5]}
                           draggable
                           onClick={() => setSelectedElement(element)}
                           onDragEnd={(e) => {
@@ -398,51 +500,53 @@ function CustomizerBuilder({ model, onNext, onBack }) {
                             handleUpdateElement(element.id, { config: newConfig });
                           }}
                         />
-                        {selectedElement?.id === element.id && <Transformer ref={transformerRef} />}
+
+                        {/* Render textual preview if it's a text element */}
+                        {(element.type === 'text' || element.type === 'textarea' || element.type === 'text-placeholder') && (
+                          <Text
+                            x={boxX}
+                            y={boxY}
+                            width={boxWidth}
+                            height={boxHeight}
+                            text={elementPreview[element.id]?.textValue || element.config.placeholder || 'Text Preview'}
+                            fontSize={element.config.fontSize || 14}
+                            fontFamily={element.config.fontStyle || 'Arial'}
+                            fill={element.config.textColor || '#000000'}
+                            align="center"
+                            verticalAlign="middle"
+                            pointerEvents="none"
+                          />
+                        )}
+
+                        {/* Render image preview if it's an image/upload element */}
+                        {(element.type === 'upload' || element.type === 'image-placeholder' || element.type === 'image-choices') && (
+                          elementPreview[element.id]?.uploadedImage ? (
+                            <CanvasImage
+                              src={elementPreview[element.id].uploadedImage}
+                              x={boxX}
+                              y={boxY}
+                              width={boxWidth}
+                              height={boxHeight}
+                            />
+                          ) : (
+                            <Text
+                              x={boxX}
+                              y={boxY}
+                              width={boxWidth}
+                              height={boxHeight}
+                              text={element.name || "Upload Area"}
+                              fontSize={12}
+                              fill="#999"
+                              align="center"
+                              verticalAlign="middle"
+                              pointerEvents="none"
+                            />
+                          )
+                        )}
+
+                        {isSelected && <Transformer ref={transformerRef} />}
                       </React.Fragment>
                     );
-                  })}
-
-                  {/* Text inside box */}
-                  {elements.map(element => {
-                    const boxElement = elements.find(e => e.type === 'customization-box');
-                    if ((element.type === 'text' || element.type === 'textarea' || element.type === 'text-placeholder') && boxElement && elementPreview[element.id]?.textValue) {
-                      return (
-                        <Text
-                          key={`text-${element.id}`}
-                          x={boxElement.config.boxX || 50}
-                          y={boxElement.config.boxY || 50}
-                          width={boxElement.config.boxWidth || 200}
-                          height={boxElement.config.boxShape === 'square' ? (boxElement.config.boxWidth || 200) : (boxElement.config.boxHeight || 200)}
-                          text={elementPreview[element.id].textValue}
-                          fontSize={element.config.fontSize || 14}
-                          fontFamily={element.config.fontStyle || 'Arial'}
-                          fill={element.config.textColor || '#000000'}
-                          align="center"
-                          verticalAlign="middle"
-                          pointerEvents="none"
-                        />
-                      );
-                    }
-                    return null;
-                  })}
-
-                  {/* Image inside box */}
-                  {elements.map(element => {
-                    const boxElement = elements.find(e => e.type === 'customization-box');
-                    if ((element.type === 'upload' || element.type === 'image-placeholder') && boxElement && elementPreview[element.id]?.uploadedImage) {
-                      return (
-                        <CanvasImage
-                          key={`image-${element.id}`}
-                          src={elementPreview[element.id].uploadedImage}
-                          x={boxElement.config.boxX || 50}
-                          y={boxElement.config.boxY || 50}
-                          width={boxElement.config.boxWidth || 200}
-                          height={boxElement.config.boxShape === 'square' ? (boxElement.config.boxWidth || 200) : (boxElement.config.boxHeight || 200)}
-                        />
-                      );
-                    }
-                    return null;
                   })}
                 </>
               ) : (
@@ -556,15 +660,15 @@ function CustomizerBuilder({ model, onNext, onBack }) {
                 return;
               }
 
-              const boxElement = elements.find(e => e.type === 'customization-box');
-              const textElement = elements.find(e => e.type === 'text');
-              const colorElement = elements.find(e => e.type === 'color-choices');
+              const textElements = elements.filter(e => e.type === 'text' || e.type === 'text-placeholder');
+              const textConfigs = textElements.reduce((acc, el) => {
+                acc[el.id] = { val: elementPreview[el.id]?.textValue, config: el.config };
+                return acc;
+              }, {});
 
               const selections = {
-                boxConfig: boxElement?.config,
-                textValue: textElement && elementPreview[textElement.id]?.textValue,
-                textConfig: textElement?.config,
-                selectedColor: colorElement?.config?.selectedColor,
+                elementsConfig: elements.map(e => ({ id: e.id, type: e.type, config: e.config })),
+                textConfigs,
                 userSelections,
                 moq: currentMOQ
               };

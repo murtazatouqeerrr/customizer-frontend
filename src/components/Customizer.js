@@ -4,7 +4,7 @@ import { Stage, Layer, Rect, Text, Circle, Image as KonvaImage } from 'react-kon
 import useImage from 'use-image';
 import './Customizer.css';
 
-const API_URL = 'https://cusstomizer-backend-production.up.railway.app/api';
+const API_URL = 'https://customizer-backend-lxfe.onrender.com/api';
 
 function UploadedImage({ src }) {
   const [image] = useImage(src);
@@ -59,10 +59,11 @@ function Customizer({ model, onNext, onSelectionChange, onBack }) {
     formData.append('file', file);
 
     try {
-      const response = await axios.post(`${API_URL}/upload/upload`, formData, {
+      const response = await axios.post(`${API_URL}/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      const fullUrl = `https://cusstomizer-backend-production.up.railway.app${response.data.url}`;
+      const baseUrl = API_URL.replace('/api', '');
+      const fullUrl = `${baseUrl}${response.data.url}`;
       setUploadedFile(fullUrl);
     } catch (err) {
       console.error('Error uploading file:', err);

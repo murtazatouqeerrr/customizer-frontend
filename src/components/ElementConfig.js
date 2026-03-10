@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './ElementConfig.css';
 
-const API_URL = 'https://cusstomizer-backend-production.up.railway.app/api';
+const API_URL = 'https://customizer-backend-lxfe.onrender.com/api';
 
 function ElementConfig({ element, onUpdate, onPreviewUpdate }) {
   const [config, setConfig] = useState(element.config || {});
@@ -38,10 +38,11 @@ function ElementConfig({ element, onUpdate, onPreviewUpdate }) {
     formData.append('file', file);
 
     try {
-      const response = await axios.post(`${API_URL}/upload/upload`, formData, {
+      const response = await axios.post(`${API_URL}/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      const fullUrl = `https://cusstomizer-backend-production.up.railway.app${response.data.url}`;
+      const baseUrl = API_URL.replace('/api', '');
+      const fullUrl = `${baseUrl}${response.data.url}`;
       setUploadedImage(fullUrl);
       onPreviewUpdate(element.id, { config, textValue, uploadedImage: fullUrl });
     } catch (err) {
@@ -250,15 +251,16 @@ function ElementConfig({ element, onUpdate, onPreviewUpdate }) {
         )}
       </div>
 
-      {/* Box Customization Controls - Only for customization-box type */}
-      {element.type === 'customization-box' && (
+      {/* Box Customization Controls - Show for elements that need positioning */}
+      {['customization-box', 'text', 'textarea', 'text-placeholder', 'upload', 'image-placeholder', 'color-choices', 'image-choices'].includes(element.type) && (
         <div className="config-section">
           <h4>Box Settings</h4>
           <div className="config-item">
-            <label>Box Shape</label>
+            <label>Shape</label>
             <select value={config.boxShape || 'rectangle'} onChange={(e) => handleConfigChange('boxShape', e.target.value)}>
               <option value="rectangle">Rectangle</option>
               <option value="square">Square</option>
+              <option value="circle">Circle</option>
             </select>
           </div>
           <div className="config-item">
@@ -286,7 +288,7 @@ function ElementConfig({ element, onUpdate, onPreviewUpdate }) {
             />
           </div>
           <div className="config-item">
-            <label>Box Height</label>
+            <label>Height</label>
             <input
               type="number"
               value={config.boxHeight || 200}

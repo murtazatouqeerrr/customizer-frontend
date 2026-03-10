@@ -1,0 +1,552 @@
+.admin-dashboard {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.admin-header {
+  background: var(--card-bg);
+  padding: 24px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-logo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo-icon {
+  font-size: 32px;
+}
+
+.admin-logo h1 {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.admin-logo p {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.admin-header-right {
+  display: flex;
+  gap: 12px;
+}
+
+.view-store-btn, .create-product-btn {
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.view-store-btn {
+  background: #f1f5f9;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.view-store-btn:hover {
+  background: #e2e8f0;
+}
+
+.create-product-btn {
+  background: var(--primary);
+  color: white;
+}
+
+.create-product-btn:hover {
+  background: var(--primary-hover);
+}
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.stat-card {
+  background: var(--card-bg);
+  padding: 24px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-num {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.products-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.products-section-title h2 {
+  font-size: 20px;
+}
+
+.product-count {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.product-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.product-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.product-card-image {
+  height: 200px;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.product-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-image-placeholder {
+  font-size: 48px;
+  color: var(--text-secondary);
+}
+
+.product-card-body {
+  padding: 20px;
+}
+
+.product-card-name {
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.product-card-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.product-card-price {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 16px;
+}
+
+.product-card-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 20px 20px;
+}
+
+.edit-btn, .config-btn, .publish-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid var(--border);
+  background: white;
+}
+
+.edit-btn:hover, .config-btn:hover {
+  background: #f8fafc;
+}
+
+.publish-btn.publish {
+  background: var(--success);
+  color: white;
+  border-color: var(--success);
+}
+
+.publish-btn.unpublish {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+
+.publish-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.publish-badge.published {
+  background: #d1fae5;
+  color: var(--success);
+}
+
+.publish-badge.draft {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+.admin-loading, .empty-state {
+  text-align: center;
+  padding: 64px 24px;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e2e8f0;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.empty-state h3 {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  color: var(--text-secondary);
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.modal {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+
+.modal-header {
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h2 {
+  font-size: 20px;
+  margin: 0;
+  color: var(--text);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  transition: background 0.2s;
+}
+
+.modal-close:hover {
+  background: #f1f5f9;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-body p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.field-category {
+  margin-bottom: 24px;
+}
+
+.field-category h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.field-checkbox {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-bottom: 4px;
+}
+
+.field-checkbox:hover {
+  background: #f8fafc;
+}
+
+.field-checkbox input[type="checkbox"] {
+  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.field-checkbox label {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-checkbox label i {
+  color: var(--text-secondary);
+}
+
+.field-selected-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 16px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: var(--radius);
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.modal-btn {
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.modal-btn.cancel {
+  background: #f1f5f9;
+  color: var(--text);
+}
+
+.modal-btn.cancel:hover {
+  background: #e2e8f0;
+}
+
+.modal-btn.primary {
+  background: var(--primary);
+  color: white;
+}
+
+.modal-btn.primary:hover {
+  background: var(--primary-hover);
+}
+
+.modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.create-modal, .config-modal {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+
+.config-instructions {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.config-category {
+  margin-bottom: 24px;
+}
+
+.config-category-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.config-fields-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.config-field-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+}
+
+.config-field-option:hover {
+  border-color: var(--primary);
+  background: #f8fafc;
+}
+
+.config-field-option.selected {
+  border-color: var(--primary);
+  background: #eff6ff;
+}
+
+.field-icon {
+  font-size: 18px;
+  color: var(--text-secondary);
+  width: 24px;
+  text-align: center;
+}
+
+.field-name {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.field-check {
+  font-size: 18px;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.config-summary {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: var(--radius);
+  font-size: 14px;
+  color: var(--text);
+}
+
+.cancel-btn, .confirm-create-btn {
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.cancel-btn {
+  background: #f1f5f9;
+  color: var(--text);
+}
+
+.cancel-btn:hover {
+  background: #e2e8f0;
+}
+
+.confirm-create-btn {
+  background: var(--primary);
+  color: white;
+}
+
+.confirm-create-btn:hover {
+  background: var(--primary-hover);
+}
+
+.confirm-create-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

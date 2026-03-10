@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import './Checkout.css';
 
-const API_URL = 'https://cusstomizer-backend-production.up.railway.app/api';
+const API_URL = 'https://customizer-backend-lxfe.onrender.com/api';
 
 function Checkout({ product, selections, quantity, onBack, onComplete }) {
   const [formData, setFormData] = useState({

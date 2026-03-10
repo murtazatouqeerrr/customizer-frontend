@@ -1,15 +1,19 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Stage, Layer, Rect, Text, Image as KonvaImage, Transformer } from 'react-konva';
 import useImage from 'use-image';
-// productData imports removed to fix build warnings
+import AreaEditor from './AreaEditor';
+import { loadMOQFromCSV, FALLBACK_MOQ_RULES } from '../utils/moqLoader';
 import './ProductConfigurator.css';
 
-const API_URL = 'https://cusstomizer-backend-production.up.railway.app/api';
+const API_URL = 'https://customizer-backend-lxfe.onrender.com/api';
+
+// Default customizable area bounds (used if not configured)
+const DEFAULT_BOUNDS = { x: 75, y: 32, w: 200, h: 298 };
 
 // --- Konva Draggable/Resizable Components ---
 
-const TransformableRect = ({ shapeProps, isSelected, onSelect, onChange, fill }) => {
+const TransformableRect = ({ shapeProps, isSelected, onSelect, onChange, fill, bounds = DEFAULT_BOUNDS }) => {
     const shapeRef = React.useRef();
     const trRef = React.useRef();
 
@@ -32,8 +36,7 @@ const TransformableRect = ({ shapeProps, isSelected, onSelect, onChange, fill })
                 cornerRadius={10}
                 draggable
                 dragBoundFunc={(pos) => {
-                    // Restrict movement to [75, 32] -> [275, 330] area
-                    const bounds = { x: 75, y: 32, w: 200, h: 298 };
+                    // Restrict movement to customizable area
                     const node = shapeRef.current;
                     if (!node) return pos;
                     const scaleX = node.scaleX() || 1;
@@ -82,7 +85,7 @@ const TransformableRect = ({ shapeProps, isSelected, onSelect, onChange, fill })
     );
 };
 
-const TransformableText = ({ shapeProps, isSelected, onSelect, onChange, text, fontSize, fontFamily, fontColor }) => {
+const TransformableText = ({ shapeProps, isSelected, onSelect, onChange, text, fontSize, fontFamily, fontColor, bounds = DEFAULT_BOUNDS }) => {
     const shapeRef = React.useRef();
     const trRef = React.useRef();
 
@@ -108,7 +111,6 @@ const TransformableText = ({ shapeProps, isSelected, onSelect, onChange, text, f
                 verticalAlign="middle"
                 draggable
                 dragBoundFunc={(pos) => {
-                    const bounds = { x: 75, y: 32, w: 200, h: 298 };
                     const node = shapeRef.current;
                     if (!node) return pos;
                     const scaleX = node.scaleX() || 1;
@@ -158,7 +160,7 @@ const TransformableText = ({ shapeProps, isSelected, onSelect, onChange, text, f
     );
 };
 
-const TransformableImage = ({ shapeProps, isSelected, onSelect, onChange, src }) => {
+const TransformableImage = ({ shapeProps, isSelected, onSelect, onChange, src, bounds = DEFAULT_BOUNDS }) => {
     const shapeRef = React.useRef();
     const trRef = React.useRef();
     const [image] = useImage(src, 'anonymous');
@@ -182,7 +184,6 @@ const TransformableImage = ({ shapeProps, isSelected, onSelect, onChange, src })
                 image={image}
                 draggable
                 dragBoundFunc={(pos) => {
-                    const bounds = { x: 75, y: 32, w: 200, h: 298 };
                     const node = shapeRef.current;
                     if (!node) return pos;
                     const scaleX = node.scaleX() || 1;
@@ -239,42 +240,117 @@ const CanvasBackground = ({ src }) => {
 
 
 // ---- Data Definitions ----
+
+// Available customization fields for admin configuration
+export const CUSTOMIZATION_FIELDS = {
+    baseImage: { id: 'baseImage', name: 'Base Product Image', icon: 'fa-image', category: 'general' },
+    quantity: { id: 'quantity', name: 'Order Quantity', icon: 'fa-chart-bar', category: 'general' },
+    glassType: { id: 'glassType', name: 'Glass Type & Size', icon: 'fa-wine-glass', category: 'scented' },
+    glassColor: { id: 'glassColor', name: 'Glass Color', icon: 'fa-palette', category: 'scented' },
+    fragrance: { id: 'fragrance', name: 'Fragrance', icon: 'fa-spray-can', category: 'scented' },
+    waxColor: { id: 'waxColor', name: 'Wax Color', icon: 'fa-fire', category: 'scented' },
+    decoration: { id: 'decoration', name: 'Decoration Method', icon: 'fa-image', category: 'scented' },
+    packaging: { id: 'packaging', name: 'Packaging', icon: 'fa-box', category: 'scented' },
+    labelText: { id: 'labelText', name: 'Label Text & Styling', icon: 'fa-pen', category: 'branding' },
+    artwork: { id: 'artwork', name: 'Artwork / Branding Upload', icon: 'fa-file-upload', category: 'branding' },
+    squareCandle: { id: 'squareCandle', name: 'Square Candle Size', icon: 'fa-square', category: 'square' },
+    specialCandle: { id: 'specialCandle', name: 'Special Candle Type', icon: 'fa-star', category: 'special' },
+    addOns: { id: 'addOns', name: 'Add-on Decorations', icon: 'fa-plus', category: 'square-special' },
+    nameOnCandle: { id: 'nameOnCandle', name: 'Name on Candle', icon: 'fa-pen', category: 'square-special' },
+    customizableArea: { id: 'customizableArea', name: 'Customizable Area', icon: 'fa-crop', category: 'general' },
+};
+
+export const CUSTOMIZATION_FIELD_IDS = Object.keys(CUSTOMIZATION_FIELDS);
+
+// --- Konva Draggable/Resizable Components ---
+
+// Get fields by category
+export const getFieldsByCategory = (category) => {
+    return Object.values(CUSTOMIZATION_FIELDS).filter(f => f.category === category);
+};
+
+// Glass Types with dimensions
+const GLASS_TYPES = [
+    { id: 'GL80', name: 'GL80', diameter: '80mm', dimensions: '80mm diameter (round)', height: 'Standard' },
+    { id: 'GL84', name: 'GL84', diameter: '84mm', dimensions: '84mm diameter (round)', height: 'Standard' },
+    { id: 'GL110', name: 'GL110', diameter: '100mm', dimensions: '100mm diameter (round)', height: 'Standard' },
+    { id: 'GL140', name: 'GL140', diameter: '140mm', dimensions: '140mm diameter (round)', height: 'Standard' },
+    { id: 'GL170', name: 'GL170', diameter: '170mm', dimensions: '170mm diameter (round)', height: 'Standard' },
+];
+
+// Square Candle Sizes
+const SQUARE_CANDLE_SIZES = [
+    { id: 'SQ70x70x160', name: '70x70x160mm', base: '70x70mm', height: '160mm' },
+    { id: 'SQ70x70x220', name: '70x70x220mm', base: '70x70mm', height: '220mm' },
+    { id: 'SQ70x70x280', name: '70x70x280mm', base: '70x70mm', height: '280mm' },
+    { id: 'SQ105x105x160', name: '105x105x160mm', base: '105x105mm', height: '160mm' },
+    { id: 'SQ105x105x220', name: '105x105x220mm', base: '105x105mm', height: '220mm' },
+    { id: 'SQ105x105x300', name: '105x105x300mm', base: '105x105mm', height: '300mm' },
+    { id: 'SQ125x125x180', name: '125x125x180mm', base: '125x125mm', height: '180mm' },
+];
+
+// Special Candle Configurations
+const SPECIAL_CANDLES = [
+    { id: 'HU1', name: 'HU1', description: '2 Candles Connected with Rope', icon: '🪢' },
+    { id: 'HU3', name: 'HU3', description: '1 Candle with Rope', icon: '🪢' },
+    { id: 'HU5', name: 'HU5', description: '1 Candle with 2 Rings', icon: '💍' },
+    { id: 'HU7', name: 'HU7', description: '2 Candles with 2 Rings and Stick', icon: '🎋' },
+    { id: 'HU13', name: 'HU13', description: '2 Candles Connected with Rope', icon: '🪢' },
+    { id: 'HU18', name: 'HU18', description: '2 Pieces of Puzzle', icon: '🧩' },
+    { id: 'HU23', name: 'HU23', description: '1 Candle with 2 Rings', icon: '💍' },
+];
+
+// Add-ons for Square and Special candles
+const ADD_ONS = [
+    { id: 'hearts', name: 'Hearts', icon: '❤️' },
+    { id: 'feet', name: 'Feet', icon: '🦶' },
+    { id: 'hands', name: 'Hands', icon: '🖐️' },
+];
+
 const GLASS_COLORS = {
     standard: [
-        { id: 'white-matt', name: 'White Matt', hex: '#f5f5f5' },
+        { id: 'ivory', name: 'Ivory', hex: '#fffff0' },
         { id: 'black-matt', name: 'Black Matt', hex: '#2a2a2a' },
     ],
     extra: [
         { id: 'amber', name: 'Amber', hex: '#d4900a' },
         { id: 'green', name: 'Green', hex: '#4a7c59' },
-    ],
-    any: [
         { id: 'pink', name: 'Pink', hex: '#e8a0bf' },
         { id: 'navy', name: 'Navy', hex: '#1e3a5f' },
         { id: 'burgundy', name: 'Burgundy', hex: '#722f37' },
         { id: 'teal', name: 'Teal', hex: '#2c7873' },
+        { id: 'coral', name: 'Coral', hex: '#ff7f50' },
+        { id: 'lavender', name: 'Lavender', hex: '#e6e6fa' },
+        { id: 'sage', name: 'Sage', hex: '#9dc183' },
+        { id: 'rust', name: 'Rust', hex: '#b7410e' },
     ]
 };
 
 const FRAGRANCES = {
     standard: [
-        { id: 'floral', name: 'Floral', icon: '🌸' },
-        { id: 'woody', name: 'Woody', icon: '🌲' },
-        { id: 'fresh', name: 'Fresh', icon: '🍃' },
-        { id: 'spicy', name: 'Spicy', icon: '🌶️' },
-        { id: 'sandalwood', name: 'Sandalwood', icon: '🪵' },
+        { id: 'floral', name: 'Floral', icon: 'fa-spray-can' },
+        { id: 'woody', name: 'Woody', icon: 'fa-tree' },
+        { id: 'fresh', name: 'Fresh', icon: 'fa-leaf' },
+        { id: 'spicy', name: 'Spicy', icon: 'fa-pepper-hot' },
+        { id: 'sandalwood', name: 'Sandalwood', icon: 'fa-tree' },
     ],
     extended: [
-        { id: 'vanilla', name: 'Vanilla', icon: '🍦' },
-        { id: 'lavender', name: 'Lavender', icon: '💜' },
-        { id: 'citrus', name: 'Citrus', icon: '🍋' },
-        { id: 'ocean', name: 'Ocean Breeze', icon: '🌊' },
-        { id: 'rose', name: 'Rose', icon: '🌹' },
-        { id: 'cinnamon', name: 'Cinnamon', icon: '🫚' },
-        { id: 'jasmine', name: 'Jasmine', icon: '🌼' },
+        { id: 'test', name: 'Test', icon: 'fa-flask' },
+        { id: 'vanilla', name: 'Vanilla', icon: 'fa-ice-cream' },
+        { id: 'lavender', name: 'Lavender', icon: 'fa-heart' },
+        { id: 'citrus', name: 'Citrus', icon: 'fa-lemon' },
+        { id: 'ocean', name: 'Ocean Breeze', icon: 'fa-water' },
+        { id: 'rose', name: 'Rose', icon: 'fa-rose' },
+        { id: 'cinnamon', name: 'Cinnamon', icon: 'fa-seedling' },
+        { id: 'jasmine', name: 'Jasmine', icon: 'fa-flower' },
+        { id: 'honey', name: 'Honey', icon: 'fa-honey-pot' },
+        { id: 'peppermint', name: 'Peppermint', icon: 'fa-candy-cane' },
+        { id: 'eucalyptus', name: 'Eucalyptus', icon: 'fa-spa' },
+        { id: 'bergamot', name: 'Bergamot', icon: 'fa-citrus' },
+        { id: 'patchouli', name: 'Patchouli', icon: 'fa-leaf' },
     ],
     custom: [
-        { id: 'custom-fragrance', name: 'Own Custom Fragrance', icon: '✨' },
+        { id: 'custom-fragrance', name: 'Own Custom Fragrance', icon: 'fa-star' },
     ]
 };
 
@@ -289,29 +365,59 @@ const WAX_COLORS = {
 };
 
 const DECORATIONS = [
-    { id: 'sticker', name: 'Sticker', icon: '🏷️', moqKey: 'sticker' },
-    { id: 'gummy', name: 'Gummy Sticker', icon: '🔖', moqKey: 'gummy' },
-    { id: 'uvPrint', name: 'UV Print', icon: '🖨️', moqKey: 'uvPrint' },
+    { id: 'sticker', name: 'Sticker', icon: 'fa-tag', moqKey: 'sticker' },
+    { id: 'gummy', name: 'Gummy Sticker', icon: 'fa-bookmark', moqKey: 'gummy' },
+    { id: 'uvPrint', name: 'UV Print', icon: 'fa-print', moqKey: 'uvPrint' },
 ];
 
 const PACKAGING = [
-    { id: 'noBox', name: 'No Box', icon: '📦', moqKey: 'noBox' },
-    { id: 'standardBox', name: 'Standard Box + Sticker', icon: '🎁', moqKey: 'standardBox' },
-    { id: 'printedBox', name: 'Full Printed Box', icon: '🖼️', moqKey: 'printedBox' },
-    { id: 'bottomLidBox', name: 'Bottom Lid Box', icon: '📫', moqKey: 'bottomLidBox' },
+    { id: 'noBox', name: 'No Box', icon: 'fa-box', moqKey: 'noBox' },
+    { id: 'standardBox', name: 'Standard Box + Sticker', icon: 'fa-gift', moqKey: 'standardBox' },
+    { id: 'printedBox', name: 'Full Printed Box', icon: 'fa-image', moqKey: 'printedBox' },
+    { id: 'bottomLidBox', name: 'Bottom Lid Box', icon: 'fa-inbox', moqKey: 'bottomLidBox' },
 ];
 
 const FONTS = ['Arial', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana', 'Trebuchet MS', 'Impact', 'Comic Sans MS'];
 
-function ProductConfigurator({ product, onNext, onBack }) {
+function ProductConfigurator({ product, onNext, onBack, isAdmin }) {
+    // Debug: Log admin_config for debugging
+    console.log('Product admin_config:', product.admin_config);
+    console.log('Product category:', product.category);
+    
+    // Get admin config - array of enabled field IDs
+    // Handle both array and string (JSON) formats from database
+    let adminConfig = product.admin_config || [];
+    if (typeof adminConfig === 'string') {
+        try {
+            adminConfig = JSON.parse(adminConfig);
+        } catch (e) {
+            adminConfig = [];
+        }
+    }
+    console.log('Parsed adminConfig:', adminConfig);
+    
+    const isConfigEnabled = (fieldId) => {
+        // If admin config is empty, show all fields by default
+        if (!adminConfig || adminConfig.length === 0) return true;
+        const result = adminConfig.includes(fieldId);
+        console.log(`isConfigEnabled(${fieldId}):`, result);
+        return result;
+    };
+    
     // State
     const [quantity, setQuantity] = useState(1);
+    const [moqData, setMoqData] = useState(null);
+    const [availableOptions, setAvailableOptions] = useState(null);
+    const [csvMoqRules, setCsvMoqRules] = useState(FALLBACK_MOQ_RULES);
+    const [productCategory, setProductCategory] = useState(product.category || 'scented-candles');
     const [expandedSections, setExpandedSections] = useState({
-        quantity: true, glassColor: true, fragrance: true, waxColor: true,
-        decoration: true, packaging: true, labelText: true, artwork: true, baseImage: true
+        quantity: true, glassType: true, glassColor: true, fragrance: true, waxColor: true,
+        decoration: true, packaging: true, labelText: true, artwork: true, baseImage: true,
+        squareCandle: true, specialCandle: true, addOns: true, nameOnCandle: true, customizableArea: true
     });
 
-    // Selections
+    // Selections - Scented Candles
+    const [selectedGlassType, setSelectedGlassType] = useState('GL80');
     const [selectedGlassColor, setSelectedGlassColor] = useState(null);
     const [glassColorTier, setGlassColorTier] = useState('standard');
     const [selectedFragrance, setSelectedFragrance] = useState(null);
@@ -321,6 +427,13 @@ function ProductConfigurator({ product, onNext, onBack }) {
     const [selectedDecoration, setSelectedDecoration] = useState('sticker');
     const [selectedPackaging, setSelectedPackaging] = useState('noBox');
 
+    // Selections - Square Candles & Specials
+    const [selectedSquareSize, setSelectedSquareSize] = useState('SQ70x70x160');
+    const [selectedSpecial, setSelectedSpecial] = useState('HU1');
+    const [selectedAddOns, setSelectedAddOns] = useState([]);
+    const [nameOnCandle, setNameOnCandle] = useState('');
+
+    // Text & Artwork
     const [labelText, setLabelText] = useState('');
     const [fontSize, setFontSize] = useState(16);
     const [fontFamily, setFontFamily] = useState('Arial');
@@ -331,6 +444,9 @@ function ProductConfigurator({ product, onNext, onBack }) {
     const [baseImage, setBaseImage] = useState(null);
     const [baseImageUrl, setBaseImageUrl] = useState(null);
 
+    const [isPublished, setIsPublished] = useState(product.is_published || false);
+    const [publishLoading, setPublishLoading] = useState(false);
+
     const fileInputRef = useRef(null);
     const baseImageInputRef = useRef(null);
 
@@ -340,6 +456,122 @@ function ProductConfigurator({ product, onNext, onBack }) {
     const [textProps, setTextProps] = useState({ x: 50, y: 160, width: 250, height: 50, rotation: 0 });
     const [artworkProps, setArtworkProps] = useState({ x: 125, y: 150, width: 100, height: 100, rotation: 0 });
 
+    // Get customizable area from admin config
+    const customizableAreaConfig = product.customizable_area || null;
+    const isAreaEnabled = customizableAreaConfig && customizableAreaConfig.enabled;
+    const areaBounds = customizableAreaConfig ? 
+        { x: customizableAreaConfig.x || 75, y: customizableAreaConfig.y || 32, w: customizableAreaConfig.width || 200, h: customizableAreaConfig.height || 298 } 
+        : DEFAULT_BOUNDS;
+
+    // Admin area editor state
+    const [areaEditorOpen, setAreaEditorOpen] = useState(false);
+    const [areaSettings, setAreaSettings] = useState(() => customizableAreaConfig || {
+        enabled: false,
+        x: 75,
+        y: 32,
+        width: 200,
+        height: 298
+    });
+
+    const [visibleSections, setVisibleSections] = useState(() => {
+        try {
+            const saved = localStorage.getItem(`product_configs_visible_${product.id}`);
+            const parsed = saved ? JSON.parse(saved) : null;
+            
+            // If localStorage exists, check if it matches admin config - if not, reset
+            if (parsed && adminConfig.length > 0) {
+                const hasAllFields = adminConfig.every(field => parsed[field] !== false);
+                if (!hasAllFields) {
+                    // Admin config has changed, reset visible sections
+                    console.log('Resetting visibleSections due to admin config change');
+                    localStorage.removeItem(`product_configs_visible_${product.id}`);
+                    return null;
+                }
+            }
+            
+            return parsed ? JSON.parse(saved) : {
+                baseImage: isConfigEnabled('baseImage'), 
+                quantity: isConfigEnabled('quantity'), 
+                glassType: isConfigEnabled('glassType'),
+                glassColor: isConfigEnabled('glassColor'), 
+                fragrance: isConfigEnabled('fragrance'),
+                waxColor: isConfigEnabled('waxColor'), 
+                decoration: isConfigEnabled('decoration'), 
+                packaging: isConfigEnabled('packaging'), 
+                labelText: isConfigEnabled('labelText'), 
+                artwork: isConfigEnabled('artwork'),
+                squareCandle: isConfigEnabled('squareCandle'),
+                specialCandle: isConfigEnabled('specialCandle'),
+                addOns: isConfigEnabled('addOns'),
+                nameOnCandle: isConfigEnabled('nameOnCandle'),
+                customizableArea: isConfigEnabled('customizableArea')
+            };
+        } catch {
+            return {
+                baseImage: isConfigEnabled('baseImage'), 
+                quantity: isConfigEnabled('quantity'), 
+                glassType: isConfigEnabled('glassType'),
+                glassColor: isConfigEnabled('glassColor'), 
+                fragrance: isConfigEnabled('fragrance'),
+                waxColor: isConfigEnabled('waxColor'), 
+                decoration: isConfigEnabled('decoration'), 
+                packaging: isConfigEnabled('packaging'), 
+                labelText: isConfigEnabled('labelText'), 
+                artwork: isConfigEnabled('artwork'),
+                squareCandle: isConfigEnabled('squareCandle'),
+                specialCandle: isConfigEnabled('specialCandle'),
+                addOns: isConfigEnabled('addOns'),
+                nameOnCandle: isConfigEnabled('nameOnCandle'),
+                customizableArea: isConfigEnabled('customizableArea')
+            };
+        }
+    });
+
+    const toggleVisibleSection = (e, key) => {
+        e.stopPropagation();
+        const nextVis = { ...visibleSections, [key]: !visibleSections[key] };
+        setVisibleSections(nextVis);
+        localStorage.setItem(`product_configs_visible_${product.id}`, JSON.stringify(nextVis));
+    };
+
+    const toggleAddOn = (addOnId) => {
+        setSelectedAddOns(prev => 
+            prev.includes(addOnId) 
+                ? prev.filter(id => id !== addOnId)
+                : [...prev, addOnId]
+        );
+    };
+
+    // Save customizable area settings
+    const [savingArea, setSavingArea] = useState(false);
+    const handleSaveArea = async () => {
+        setSavingArea(true);
+        try {
+            await axios.put(`${API_URL}/models/${product.id}`, {
+                customizable_area: areaSettings
+            });
+            alert('Customizable area saved!');
+        } catch (err) {
+            console.error('Error saving area:', err);
+            alert('Error saving area settings');
+        } finally {
+            setSavingArea(false);
+        }
+    };
+
+    const handleTogglePublish = async () => {
+        setPublishLoading(true);
+        try {
+            const res = await axios.put(`${API_URL}/models/${product.id}/publish`);
+            setIsPublished(res.data.is_published);
+        } catch (err) {
+            console.error('Error toggling publish:', err);
+            alert('Error updating publish status');
+        } finally {
+            setPublishLoading(false);
+        }
+    };
+
     const checkDeselect = (e) => {
         const clickedOnEmpty = e.target === e.target.getStage() || e.target.name() === 'background';
         if (clickedOnEmpty) {
@@ -347,36 +579,109 @@ function ProductConfigurator({ product, onNext, onBack }) {
         }
     };
 
+    // Debug product category
+    console.log('productCategory:', productCategory);
+    console.log('product.moq:', product.moq);
+    
     // Is this a scented candle with MOQ rules?
-    const isScentedCandle = product.category === 'scented-candles' || product.moq;
-    const moqData = product.moq || null;
+    const isScentedCandle = productCategory === 'scented-candles' || product.moq;
+    const isSquareCandle = productCategory === 'square-candles';
+    const isSpecialCandle = productCategory === 'special-candles';
+    
+    console.log('isScentedCandle:', isScentedCandle);
+    console.log('isSquareCandle:', isSquareCandle);
+    console.log('isSpecialCandle:', isSpecialCandle);
+
+    // Load MOQ rules from CSV on component mount
+    useEffect(() => {
+        const loadCSV = async () => {
+            const rules = await loadMOQFromCSV(`${API_URL}/csv/moq`);
+            setCsvMoqRules(rules);
+        };
+        loadCSV();
+    }, []);
+
+    // Fetch MOQ data when glass type or quantity changes
+    useEffect(() => {
+        if (isScentedCandle && selectedGlassType) {
+            const fetchMOQ = async () => {
+                try {
+                    const response = await axios.post(`${API_URL}/moq/check`, {
+                        glassType: selectedGlassType,
+                        quantity,
+                        selections: {
+                            glassColorTier,
+                            fragranceTier,
+                            waxColorTier,
+                            decoration: selectedDecoration,
+                            packaging: selectedPackaging
+                        }
+                    });
+                    setMoqData(response.data);
+                    setAvailableOptions(response.data.availableOptions);
+                } catch (error) {
+                    console.error('Error fetching MOQ:', error);
+                }
+            };
+            fetchMOQ();
+        }
+    }, [selectedGlassType, quantity, glassColorTier, fragranceTier, waxColorTier, selectedDecoration, selectedPackaging, isScentedCandle]);
 
     // Calculate current MOQ requirement
     const getCurrentMOQ = () => {
-        if (!moqData) return 1;
-        let maxMoq = 1;
-
-        if (moqData.glassColor && moqData.glassColor[glassColorTier]) maxMoq = Math.max(maxMoq, moqData.glassColor[glassColorTier].moq);
-        if (moqData.fragrance && moqData.fragrance[fragranceTier]) maxMoq = Math.max(maxMoq, moqData.fragrance[fragranceTier].moq);
-        if (moqData.waxColor && moqData.waxColor[waxColorTier]) maxMoq = Math.max(maxMoq, moqData.waxColor[waxColorTier].moq);
-        if (moqData.decoration && moqData.decoration[selectedDecoration]) maxMoq = Math.max(maxMoq, moqData.decoration[selectedDecoration].moq);
-        if (moqData.packaging && moqData.packaging[selectedPackaging]) maxMoq = Math.max(maxMoq, moqData.packaging[selectedPackaging].moq);
-
-        return maxMoq;
+        if (moqData && moqData.minimumMOQ) {
+            return moqData.minimumMOQ;
+        }
+        return 1;
     };
 
     const currentMOQ = getCurrentMOQ();
-    const moqMet = quantity >= currentMOQ;
+    const moqMet = moqData ? moqData.moqMet : quantity >= currentMOQ;
 
     // Check if an option tier is unlocked
     const isTierUnlocked = (category, tierKey) => {
-        if (!moqData || !moqData[category] || !moqData[category][tierKey]) return true;
-        return quantity >= moqData[category][tierKey].moq;
+        if (!availableOptions) {
+            console.log('No availableOptions yet');
+            return false; // Default to locked until data loads
+        }
+        
+        // Map frontend category names to backend response
+        const categoryMap = {
+            'fragrance': 'fragrances',
+            'glassColor': 'glassColors',
+            'waxColor': 'waxColors',
+            'decoration': 'decorations',
+            'packaging': 'packaging'
+        };
+        
+        const backendCategory = categoryMap[category] || category;
+        
+        if (!availableOptions[backendCategory]) {
+            console.log(`Category ${backendCategory} not found in availableOptions`);
+            return false;
+        }
+        
+        const isUnlocked = availableOptions[backendCategory][tierKey] === true;
+        console.log(`isTierUnlocked(${category}, ${tierKey}):`, isUnlocked);
+        return isUnlocked;
     };
 
     const getOptionMOQ = (category, key) => {
-        if (!moqData || !moqData[category] || !moqData[category][key]) return 1;
-        return moqData[category][key].moq;
+        const rules = csvMoqRules[selectedGlassType];
+        if (!rules) return 1;
+        
+        const mapping = {
+            glassColor: { extra: 'extraColors', any: 'anyColor' },
+            fragrance: { extended: 'extraFragrances', custom: 'ownFragrance' },
+            waxColor: { extra: 'extraWaxColors' },
+            decorations: { gummy: 'gummy', uvPrint: 'uvPrint' },
+            packaging: { printedBox: 'printedBox', bottomLidBox: 'bottomLidBox' }
+        };
+        
+        if (mapping[category] && mapping[category][key]) {
+            return rules[mapping[category][key]] || 1;
+        }
+        return 1;
     };
 
     const getMoqBadgeClass = (moq) => {
@@ -390,16 +695,46 @@ function ProductConfigurator({ product, onNext, onBack }) {
         let basePrice = 5.00;
         let unitPrice = basePrice;
 
-        if (glassColorTier === 'extra') unitPrice += 0.50;
-        if (glassColorTier === 'any') unitPrice += 1.50;
-        if (fragranceTier === 'extended') unitPrice += 0.75;
-        if (fragranceTier === 'custom') unitPrice += 2.00;
-        if (waxColorTier === 'extra') unitPrice += 0.30;
-        if (selectedDecoration === 'gummy') unitPrice += 0.40;
-        if (selectedDecoration === 'uvPrint') unitPrice += 1.00;
-        if (selectedPackaging === 'standardBox') unitPrice += 0.50;
-        if (selectedPackaging === 'printedBox') unitPrice += 1.50;
-        if (selectedPackaging === 'bottomLidBox') unitPrice += 2.00;
+        // Scented Candle pricing
+        if (isScentedCandle) {
+            if (glassColorTier === 'extra') unitPrice += 0.50;
+            if (fragranceTier === 'extended') unitPrice += 0.75;
+            if (fragranceTier === 'custom') unitPrice += 2.00;
+            if (waxColorTier === 'extra') unitPrice += 0.30;
+            if (selectedDecoration === 'gummy') unitPrice += 0.40;
+            if (selectedDecoration === 'uvPrint') unitPrice += 1.00;
+            if (selectedPackaging === 'standardBox') unitPrice += 0.50;
+            if (selectedPackaging === 'printedBox') unitPrice += 1.50;
+            if (selectedPackaging === 'bottomLidBox') unitPrice += 2.00;
+        }
+
+        // Square Candle pricing
+        if (isSquareCandle) {
+            // Different base prices for different sizes
+            const sizePrices = {
+                'SQ70x70x160': 8.00,
+                'SQ70x70x220': 10.00,
+                'SQ70x70x280': 12.00,
+                'SQ105x105x160': 12.00,
+                'SQ105x105x220': 15.00,
+                'SQ105x105x300': 18.00,
+                'SQ125x125x180': 15.00,
+            };
+            basePrice = sizePrices[selectedSquareSize] || 10.00;
+            unitPrice = basePrice;
+            // Add-on pricing
+            if (selectedAddOns.length > 0) unitPrice += selectedAddOns.length * 1.50;
+            if (nameOnCandle) unitPrice += 2.00;
+        }
+
+        // Special Candle pricing
+        if (isSpecialCandle) {
+            basePrice = 15.00;
+            unitPrice = basePrice;
+            // Add-on pricing
+            if (selectedAddOns.length > 0) unitPrice += selectedAddOns.length * 1.50;
+            if (nameOnCandle) unitPrice += 2.00;
+        }
 
         let discount = 1;
         if (quantity >= 1000) discount = 0.85;
@@ -425,11 +760,16 @@ function ProductConfigurator({ product, onNext, onBack }) {
         formData.append('file', file);
 
         try {
-            const response = await axios.post(`${API_URL}/upload/upload`, formData, {
+            const response = await axios.post(`${API_URL}/upload`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
+            console.log('Upload response:', response.data);
             setUploadedFile(file.name);
-            setUploadedFileUrl(`https://cusstomizer-backend-production.up.railway.app${response.data.url}`);
+            // Use localhost URL for the uploaded image
+            const baseUrl = API_URL.replace('/api', '');
+            const fullUrl = `${baseUrl}${response.data.url}`;
+            console.log('Full image URL:', fullUrl);
+            setUploadedFileUrl(fullUrl);
         } catch (err) {
             console.error('Upload error:', err);
             alert('Error uploading file');
@@ -449,42 +789,62 @@ function ProductConfigurator({ product, onNext, onBack }) {
         formData.append('file', file);
 
         try {
-            const response = await axios.post(`${API_URL}/upload/upload`, formData, {
+            const response = await axios.post(`${API_URL}/upload`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             setBaseImage(file.name);
-            setBaseImageUrl(`https://cusstomizer-backend-production.up.railway.app${response.data.url}`);
+            const baseUrl = API_URL.replace('/api', '');
+            const imageUrl = `${baseUrl}${response.data.url}`;
+            setBaseImageUrl(imageUrl);
+            
+            if (isAdmin && product.id) {
+                await axios.put(`${API_URL}/models/${product.id}`, { image_url: imageUrl });
+                alert('Base image saved!');
+            }
         } catch (err) {
             console.error('Upload error:', err);
             alert('Error uploading base image');
         }
     };
 
-    const removeBaseImage = () => {
+    const removeBaseImage = async () => {
         setBaseImage(null);
         setBaseImageUrl(null);
+        if (isAdmin && product.id) {
+            try {
+                await axios.put(`${API_URL}/models/${product.id}`, { image_url: null });
+            } catch (err) { console.error(err); }
+        }
     };
-
     const handleNext = () => {
         if (!moqMet) {
             alert(`Minimum order quantity is ${currentMOQ}. Please adjust your quantity.`);
             return;
         }
 
-        const glassColorHex = [...GLASS_COLORS.standard, ...GLASS_COLORS.extra, ...GLASS_COLORS.any]
+        const glassColorHex = [...GLASS_COLORS.standard, ...GLASS_COLORS.extra]
             .find(c => c.id === selectedGlassColor)?.hex || 'transparent';
 
         const selections = {
+            // Product Category
+            productCategory,
+            // Glass Type
+            glassType: selectedGlassType,
+            // Glass Color
             glassColor: selectedGlassColor,
             glassColorHex,
             glassColorProps,
             glassColorTier,
+            // Fragrance
             fragrance: selectedFragrance,
             fragranceTier,
+            // Wax Color
             waxColor: selectedWaxColor,
             waxColorTier,
+            // Decoration & Packaging
             decoration: selectedDecoration,
             packaging: selectedPackaging,
+            // Text & Artwork
             labelText,
             textProps,
             labelConfig: { fontSize, fontFamily, fontColor },
@@ -492,6 +852,13 @@ function ProductConfigurator({ product, onNext, onBack }) {
             artworkUrl: uploadedFileUrl,
             artworkProps,
             baseImageUrl,
+            // Square Candle Options
+            squareSize: selectedSquareSize,
+            addOns: selectedAddOns,
+            candleName: nameOnCandle,
+            // Special Candle Options
+            specialType: selectedSpecial,
+            // Pricing
             pricing: { unitPrice: pricing.unitPrice, totalPrice: pricing.totalPrice },
             moq: currentMOQ,
         };
@@ -506,24 +873,51 @@ function ProductConfigurator({ product, onNext, onBack }) {
             onClick={() => !locked && onSelect(opt.id)}
             title={locked ? `Requires MOQ ${moq}+` : ''}
         >
-            {opt.icon && <span>{opt.icon}</span>}
+            {opt.icon && <i className={`fas ${opt.icon}`}></i>}
             <span>{opt.name}</span>
             {moq > 1 && (
                 <span className={`moq-badge ${getMoqBadgeClass(moq)}`}>MOQ {moq}</span>
             )}
-            {locked && <span>🔒</span>}
+            {locked && <i className="fas fa-lock"></i>}
         </div>
     );
 
     return (
-        <div className="product-configurator">
+        <div className="configurator-container">
             {/* Top Bar */}
-            <div className="configurator-top-bar">
-                <button className="back-btn" onClick={onBack}>← Back</button>
-                <h2>{product.name || product.id}</h2>
-                <div className="price-display">
-                    <span className="price-label">Total</span>
-                    <span className="price-value">${pricing.totalPrice}</span>
+            <div className="configurator-top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <button className="back-btn" onClick={onBack}>← Back</button>
+                    <h2>{product.name || product.id}</h2>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    {isAdmin && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '0.85rem', color: isPublished ? '#4CAF50' : '#f44336' }}>
+                                {isPublished ? '● Published' : '○ Draft'}
+                            </span>
+                            <button
+                                onClick={handleTogglePublish}
+                                disabled={publishLoading}
+                                style={{
+                                    padding: '4px 12px',
+                                    borderRadius: '4px',
+                                    background: isPublished ? '#333' : '#FF9800',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem'
+                                }}
+                            >
+                                {publishLoading ? '...' : isPublished ? 'Unpublish' : 'Publish to Store'}
+                            </button>
+                        </div>
+                    )}
+                    <div className="price-display">
+                        <span className="price-label">Total</span>
+                        <span className="price-value">${pricing.totalPrice}</span>
+                    </div>
                 </div>
             </div>
 
@@ -541,6 +935,21 @@ function ProductConfigurator({ product, onNext, onBack }) {
                                 {(baseImageUrl || product.image_url) && (
                                     <CanvasBackground src={baseImageUrl || product.image_url} />
                                 )}
+                                
+                                {/* Customizable Area Indicator (shown to users when enabled) */}
+                                {isAreaEnabled && !isAdmin && (
+                                    <Rect
+                                        x={areaBounds.x}
+                                        y={areaBounds.y}
+                                        width={areaBounds.w}
+                                        height={areaBounds.h}
+                                        fill="rgba(102, 126, 234, 0.1)"
+                                        stroke="#667eea"
+                                        strokeWidth={1}
+                                        dash={[5, 5]}
+                                        cornerRadius={4}
+                                    />
+                                )}
 
                                 {/* Glass color overlay */}
                                 {selectedGlassColor && (
@@ -550,9 +959,10 @@ function ProductConfigurator({ product, onNext, onBack }) {
                                         onSelect={() => setSelectedShape('glassColor')}
                                         onChange={setGlassColorProps}
                                         fill={
-                                            [...GLASS_COLORS.standard, ...GLASS_COLORS.extra, ...GLASS_COLORS.any]
+                                            [...GLASS_COLORS.standard, ...GLASS_COLORS.extra]
                                                 .find(c => c.id === selectedGlassColor)?.hex || 'transparent'
                                         }
+                                        bounds={isAreaEnabled ? areaBounds : DEFAULT_BOUNDS}
                                     />
                                 )}
 
@@ -567,6 +977,7 @@ function ProductConfigurator({ product, onNext, onBack }) {
                                         fontSize={fontSize}
                                         fontFamily={fontFamily}
                                         fontColor={fontColor}
+                                        bounds={isAreaEnabled ? areaBounds : DEFAULT_BOUNDS}
                                     />
                                 )}
 
@@ -578,6 +989,7 @@ function ProductConfigurator({ product, onNext, onBack }) {
                                         onSelect={() => setSelectedShape('artwork')}
                                         onChange={setArtworkProps}
                                         src={uploadedFileUrl}
+                                        bounds={isAreaEnabled ? areaBounds : DEFAULT_BOUNDS}
                                     />
                                 )}
 
@@ -591,73 +1003,293 @@ function ProductConfigurator({ product, onNext, onBack }) {
                 {/* Right: Options */}
                 <div className="configurator-options">
 
-                    {/* 0. BASE IMAGE UPLOAD */}
-                    <div className="option-section">
-                        <div className="option-section-header" onClick={() => toggleSection('baseImage')}>
-                            <h3><span className="section-icon">🖼️</span> Base Product Image</h3>
-                            <span className={`section-toggle ${(expandedSections.baseImage !== false) ? 'open' : ''}`}>▼</span>
-                        </div>
-                        {(expandedSections.baseImage !== false) && (
-                            <div className="option-section-body">
-                                <input
-                                    ref={baseImageInputRef}
-                                    type="file"
-                                    accept="image/*"
-                                    style={{ display: 'none' }}
-                                    onChange={handleBaseImageUpload}
-                                />
-                                <div className="upload-area" onClick={() => baseImageInputRef.current?.click()}>
-                                    <span className="upload-icon">📷</span>
-                                    <p>Click to upload a base image of the product</p>
-                                    <p className="upload-hint">Supports: PNG, JPG (Transparent PNG recommended)</p>
-                                </div>
-                                {baseImage && (
-                                    <div className="uploaded-file-info">
-                                        <span>📄</span>
-                                        <span className="file-name">{baseImage}</span>
-                                        <button className="remove-file" onClick={removeBaseImage}>✕</button>
-                                    </div>
-                                )}
+                    {/* Category Tabs */}
+                    {isAdmin && (
+                        <div className="option-section">
+                            <div className="category-tabs">
+                                <button 
+                                    className={`category-tab ${productCategory === 'scented-candles' ? 'active' : ''}`}
+                                    onClick={() => setProductCategory('scented-candles')}
+                                >
+                                    🕯️ Scented Candles
+                                </button>
+                                <button 
+                                    className={`category-tab ${productCategory === 'square-candles' ? 'active' : ''}`}
+                                    onClick={() => setProductCategory('square-candles')}
+                                >
+                                    🟥 Square Candles
+                                </button>
+                                <button 
+                                    className={`category-tab ${productCategory === 'special-candles' ? 'active' : ''}`}
+                                    onClick={() => setProductCategory('special-candles')}
+                                >
+                                    ✨ Specials
+                                </button>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
+
+                    {/* Customizable Area Configuration (Admin only) */}
+                    {isAdmin && (
+                        <div className="option-section">
+                            <div className="option-section-header" onClick={() => toggleSection('customizableArea')}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-crop section-icon"></i> Customizable Area</h3>
+                                    <div onClick={(e) => toggleVisibleSection(e, 'customizableArea')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                        <input type="checkbox" checked={visibleSections.customizableArea !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                    </div>
+                                </div>
+                                <span className={`section-toggle ${expandedSections.customizableArea ? 'open' : ''}`}>▼</span>
+                            </div>
+                            {expandedSections.customizableArea && (
+                                <div className="option-section-body">
+                                    <div className="area-config-toggle">
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={areaSettings.enabled}
+                                                onChange={(e) => setAreaSettings({ ...areaSettings, enabled: e.target.checked })}
+                                            />
+                                            <span>Enable customizable area for users</span>
+                                        </label>
+                                    </div>
+                                    
+                                    {areaSettings.enabled && (
+                                        <AreaEditor
+                                            productImage={baseImageUrl || product.image_url}
+                                            initialArea={areaSettings}
+                                            onAreaChange={(newArea) => setAreaSettings({ ...areaSettings, ...newArea })}
+                                        />
+                                    )}
+                                    
+                                    <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.75rem' }}>
+                                        Users can only place and move text/artwork within this area. Canvas size: 350x420
+                                    </p>
+                                    
+                                    <button 
+                                        className="save-area-btn"
+                                        onClick={handleSaveArea}
+                                        disabled={savingArea}
+                                        style={{
+                                            marginTop: '1rem',
+                                            padding: '0.5rem 1rem',
+                                            background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            color: 'white',
+                                            fontSize: '0.85rem',
+                                            fontWeight: '600',
+                                            cursor: savingArea ? 'not-allowed' : 'pointer'
+                                        }}
+                                    >
+                                        {savingArea ? 'Saving...' : '💾 Save Area Settings'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 0. BASE IMAGE UPLOAD */}
+                    {(isAdmin || isConfigEnabled('baseImage')) && (isAdmin || visibleSections.baseImage) && (
+                        <div className="option-section">
+                            <div className="option-section-header" onClick={() => toggleSection('baseImage')}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-image section-icon"></i> Base Product Image</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'baseImage')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.baseImage !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
+                                <span className={`section-toggle ${(expandedSections.baseImage !== false) ? 'open' : ''}`}>▼</span>
+                            </div>
+                            {(expandedSections.baseImage !== false) && (
+                                <div className="option-section-body">
+                                    <input
+                                        ref={baseImageInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        style={{ display: 'none' }}
+                                        onChange={handleBaseImageUpload}
+                                    />
+                                    <div className="upload-area" onClick={() => baseImageInputRef.current?.click()}>
+                                        <i className="fas fa-camera upload-icon"></i>
+                                        <p>Click to upload a base image of the product</p>
+                                        <p className="upload-hint">Supports: PNG, JPG (Transparent PNG recommended)</p>
+                                    </div>
+                                    {baseImage && (
+                                        <div className="uploaded-file-info">
+                                            <span>📄</span>
+                                            <span className="file-name">{baseImage}</span>
+                                            <button className="remove-file" onClick={removeBaseImage}>✕</button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* 1. QUANTITY */}
-                    <div className="option-section">
-                        <div className="option-section-header" onClick={() => toggleSection('quantity')}>
-                            <h3><span className="section-icon">📊</span> Order Quantity</h3>
-                            <span className={`section-toggle ${expandedSections.quantity ? 'open' : ''}`}>▼</span>
-                        </div>
-                        {expandedSections.quantity && (
-                            <div className="option-section-body">
-                                <div className="quantity-row">
-                                    <button className="qty-btn" onClick={() => setQuantity(Math.max(1, quantity - 1))}>−</button>
-                                    <input
-                                        className="qty-input"
-                                        type="number"
-                                        min="1"
-                                        value={quantity}
-                                        onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                                    />
-                                    <button className="qty-btn" onClick={() => setQuantity(quantity + 1)}>+</button>
-                                    <button className="qty-btn" onClick={() => setQuantity(quantity + 10)} style={{ width: 'auto', padding: '0 12px', fontSize: '0.8rem' }}>+10</button>
-                                    <button className="qty-btn" onClick={() => setQuantity(quantity + 100)} style={{ width: 'auto', padding: '0 12px', fontSize: '0.8rem' }}>+100</button>
+                    {(isAdmin || isConfigEnabled('quantity')) && (isAdmin || visibleSections.quantity !== false) && (
+                        <div className="option-section">
+                            <div className="option-section-header" onClick={() => toggleSection('quantity')}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-chart-bar section-icon"></i> Order Quantity</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'quantity')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.quantity !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
                                 </div>
-                                <div className={`moq-info ${moqMet ? 'moq-ok' : 'moq-error'}`}>
-                                    {moqMet
-                                        ? `✓ MOQ satisfied (minimum: ${currentMOQ} pcs)`
-                                        : `✗ Current MOQ: ${currentMOQ} pcs — need ${currentMOQ - quantity} more`
-                                    }
-                                </div>
+                                <span className={`section-toggle ${expandedSections.quantity ? 'open' : ''}`}>▼</span>
                             </div>
-                        )}
-                    </div>
+                            {expandedSections.quantity && (
+                                <div className="option-section-body">
+                                    <div className="quantity-row">
+                                        <button className="qty-btn" onClick={() => setQuantity(Math.max(1, quantity - 1))}>−</button>
+                                        <input
+                                            className="qty-input"
+                                            type="number"
+                                            min="1"
+                                            value={quantity}
+                                            onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                                        />
+                                        <button className="qty-btn" onClick={() => setQuantity(quantity + 1)}>+</button>
+                                        <button className="qty-btn" onClick={() => setQuantity(quantity + 10)} style={{ width: 'auto', padding: '0 12px', fontSize: '0.8rem' }}>+10</button>
+                                        <button className="qty-btn" onClick={() => setQuantity(quantity + 100)} style={{ width: 'auto', padding: '0 12px', fontSize: '0.8rem' }}>+100</button>
+                                    </div>
+                                    <div className={`moq-info ${moqMet ? 'moq-ok' : 'moq-error'}`}>
+                                        {moqMet
+                                            ? `✓ MOQ satisfied (minimum: ${currentMOQ} pcs)`
+                                            : `✗ Current MOQ: ${currentMOQ} pcs — need ${currentMOQ - quantity} more`
+                                        }
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 1B. GLASS TYPE - Only for Scented Candles */}
+                    {isScentedCandle && (isAdmin || isConfigEnabled('glassType')) && (isAdmin || visibleSections.glassType !== false) && (
+                        <div className="option-section">
+                            <div className="option-section-header" onClick={() => toggleSection('glassType')}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-wine-glass section-icon"></i> Glass Type & Size</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'glassType')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.glassType !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
+                                <span className={`section-toggle ${expandedSections.glassType ? 'open' : ''}`}>▼</span>
+                            </div>
+                            {expandedSections.glassType && (
+                                <div className="option-section-body">
+                                    <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', margin: '0 0 0.75rem' }}>Select the glass jar size</p>
+                                    <div className="glass-type-grid">
+                                        {GLASS_TYPES.map(gt => (
+                                            <div
+                                                key={gt.id}
+                                                className={`glass-type-card ${selectedGlassType === gt.id ? 'selected' : ''}`}
+                                                onClick={() => setSelectedGlassType(gt.id)}
+                                            >
+                                                <div className="glass-type-name">{gt.name}</div>
+                                                <div className="glass-type-diameter">{gt.diameter}</div>
+                                                <div className="glass-type-dims">{gt.dimensions}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 1C. SQUARE CANDLE SIZE - Only for Square Candles */}
+                    {isSquareCandle && (isAdmin || isConfigEnabled('squareCandle')) && (isAdmin || visibleSections.squareCandle !== false) && (
+                        <div className="option-section">
+                            <div className="option-section-header" onClick={() => toggleSection('squareCandle')}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-square section-icon"></i> Square Candle Size</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'squareCandle')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.squareCandle !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
+                                <span className={`section-toggle ${expandedSections.squareCandle ? 'open' : ''}`}>▼</span>
+                            </div>
+                            {expandedSections.squareCandle && (
+                                <div className="option-section-body">
+                                    <div className="glass-type-grid">
+                                        {SQUARE_CANDLE_SIZES.map(sq => (
+                                            <div
+                                                key={sq.id}
+                                                className={`glass-type-card ${selectedSquareSize === sq.id ? 'selected' : ''}`}
+                                                onClick={() => setSelectedSquareSize(sq.id)}
+                                            >
+                                                <div className="glass-type-name">{sq.name}</div>
+                                                <div className="glass-type-diameter">Base: {sq.base}</div>
+                                                <div className="glass-type-dims">Height: {sq.height}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 1D. SPECIAL CANDLE TYPE - Only for Special Candles */}
+                    {isSpecialCandle && (isAdmin || isConfigEnabled('specialCandle')) && (isAdmin || visibleSections.specialCandle !== false) && (
+                        <div className="option-section">
+                            <div className="option-section-header" onClick={() => toggleSection('specialCandle')}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-star section-icon"></i> Special Candle Type</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'specialCandle')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.specialCandle !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
+                                <span className={`section-toggle ${expandedSections.specialCandle ? 'open' : ''}`}>▼</span>
+                            </div>
+                            {expandedSections.specialCandle && (
+                                <div className="option-section-body">
+                                    <div className="glass-type-grid">
+                                        {SPECIAL_CANDLES.map(sp => (
+                                            <div
+                                                key={sp.id}
+                                                className={`glass-type-card ${selectedSpecial === sp.id ? 'selected' : ''}`}
+                                                onClick={() => setSelectedSpecial(sp.id)}
+                                            >
+                                                <div className="glass-type-name">{sp.icon} {sp.name}</div>
+                                                <div className="glass-type-dims">{sp.description}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* 2. GLASS COLOR */}
-                    {isScentedCandle && (
+                    {isScentedCandle && (isAdmin || isConfigEnabled('glassColor')) && (isAdmin || visibleSections.glassColor !== false) && (
                         <div className="option-section">
                             <div className="option-section-header" onClick={() => toggleSection('glassColor')}>
-                                <h3><span className="section-icon">🎨</span> Glass Color</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-palette section-icon"></i> Glass Color</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'glassColor')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.glassColor !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
                                 <span className={`section-toggle ${expandedSections.glassColor ? 'open' : ''}`}>▼</span>
                             </div>
                             {expandedSections.glassColor && (
@@ -691,24 +1323,9 @@ function ProductConfigurator({ product, onNext, onBack }) {
                                                 </div>
                                             );
                                         })}
-                                        {/* Any color */}
-                                        {GLASS_COLORS.any.map(c => {
-                                            const locked = !isTierUnlocked('glassColor', 'any');
-                                            return (
-                                                <div
-                                                    key={c.id}
-                                                    className={`color-swatch ${selectedGlassColor === c.id ? 'selected' : ''} ${locked ? 'locked' : ''}`}
-                                                    style={{ backgroundColor: c.hex }}
-                                                    onClick={() => { if (!locked) { setSelectedGlassColor(c.id); setGlassColorTier('any'); } }}
-                                                    title={locked ? `MOQ ${getOptionMOQ('glassColor', 'any')}+` : c.name}
-                                                >
-                                                    <span className="swatch-label">{c.name} {locked ? '🔒' : ''}</span>
-                                                </div>
-                                            );
-                                        })}
                                     </div>
                                     {!isTierUnlocked('glassColor', 'extra') && (
-                                        <p className="locked-msg">🔒 Extra colors require MOQ {getOptionMOQ('glassColor', 'extra')}+ | Custom colors require MOQ {getOptionMOQ('glassColor', 'any')}+</p>
+                                        <p className="locked-msg">🔒 Extra colors require MOQ {getOptionMOQ('glassColor', 'extra')}+</p>
                                     )}
                                 </div>
                             )}
@@ -716,10 +1333,18 @@ function ProductConfigurator({ product, onNext, onBack }) {
                     )}
 
                     {/* 3. FRAGRANCE */}
-                    {isScentedCandle && (
+                    {isScentedCandle && (isAdmin || isConfigEnabled('fragrance')) && (isAdmin || visibleSections.fragrance !== false) && (
                         <div className="option-section">
                             <div className="option-section-header" onClick={() => toggleSection('fragrance')}>
-                                <h3><span className="section-icon">🌸</span> Fragrance</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-spray-can section-icon"></i> Fragrance</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'fragrance')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.fragrance !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
                                 <span className={`section-toggle ${expandedSections.fragrance ? 'open' : ''}`}>▼</span>
                             </div>
                             {expandedSections.fragrance && (
@@ -737,7 +1362,12 @@ function ProductConfigurator({ product, onNext, onBack }) {
                                             const locked = !isTierUnlocked('fragrance', 'extended');
                                             return renderOptionChip(
                                                 f, selectedFragrance === f.id,
-                                                (id) => { setSelectedFragrance(id); setFragranceTier('extended'); },
+                                                (id) => { 
+                                                    if (!locked) {
+                                                        setSelectedFragrance(id); 
+                                                        setFragranceTier('extended');
+                                                    }
+                                                },
                                                 moq, locked
                                             );
                                         })}
@@ -747,7 +1377,12 @@ function ProductConfigurator({ product, onNext, onBack }) {
                                             const locked = !isTierUnlocked('fragrance', 'custom');
                                             return renderOptionChip(
                                                 f, selectedFragrance === f.id,
-                                                (id) => { setSelectedFragrance(id); setFragranceTier('custom'); },
+                                                (id) => { 
+                                                    if (!locked) {
+                                                        setSelectedFragrance(id); 
+                                                        setFragranceTier('custom');
+                                                    }
+                                                },
                                                 moq, locked
                                             );
                                         })}
@@ -761,10 +1396,18 @@ function ProductConfigurator({ product, onNext, onBack }) {
                     )}
 
                     {/* 4. WAX COLOR */}
-                    {isScentedCandle && (
+                    {isScentedCandle && (isAdmin || isConfigEnabled('waxColor')) && (isAdmin || visibleSections.waxColor !== false) && (
                         <div className="option-section">
                             <div className="option-section-header" onClick={() => toggleSection('waxColor')}>
-                                <h3><span className="section-icon">🕯️</span> Wax Color</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-fire section-icon"></i> Wax Color</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'waxColor')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.waxColor !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
                                 <span className={`section-toggle ${expandedSections.waxColor ? 'open' : ''}`}>▼</span>
                             </div>
                             {expandedSections.waxColor && (
@@ -805,10 +1448,18 @@ function ProductConfigurator({ product, onNext, onBack }) {
                     )}
 
                     {/* 5. DECORATION */}
-                    {isScentedCandle && (
+                    {isScentedCandle && (isAdmin || isConfigEnabled('decoration')) && (isAdmin || visibleSections.decoration !== false) && (
                         <div className="option-section">
                             <div className="option-section-header" onClick={() => toggleSection('decoration')}>
-                                <h3><span className="section-icon">🖼️</span> Decoration Method</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-image section-icon"></i> Decoration Method</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'decoration')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.decoration !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
                                 <span className={`section-toggle ${expandedSections.decoration ? 'open' : ''}`}>▼</span>
                             </div>
                             {expandedSections.decoration && (
@@ -830,10 +1481,18 @@ function ProductConfigurator({ product, onNext, onBack }) {
                     )}
 
                     {/* 6. PACKAGING */}
-                    {isScentedCandle && (
+                    {isScentedCandle && (isAdmin || isConfigEnabled('packaging')) && (isAdmin || visibleSections.packaging !== false) && (
                         <div className="option-section">
                             <div className="option-section-header" onClick={() => toggleSection('packaging')}>
-                                <h3><span className="section-icon">📦</span> Packaging</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-box section-icon"></i> Packaging</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'packaging')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.packaging !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
                                 <span className={`section-toggle ${expandedSections.packaging ? 'open' : ''}`}>▼</span>
                             </div>
                             {expandedSections.packaging && (
@@ -854,71 +1513,164 @@ function ProductConfigurator({ product, onNext, onBack }) {
                         </div>
                     )}
 
-                    {/* 7. LABEL TEXT */}
-                    <div className="option-section">
-                        <div className="option-section-header" onClick={() => toggleSection('labelText')}>
-                            <h3><span className="section-icon">✏️</span> Label Text & Styling</h3>
-                            <span className={`section-toggle ${expandedSections.labelText ? 'open' : ''}`}>▼</span>
+                    {/* 6B. ADD-ONS - For Square and Special Candles */}
+                    {(isSquareCandle || isSpecialCandle) && (isAdmin || isConfigEnabled('addOns')) && (isAdmin || visibleSections.addOns !== false) && (
+                        <div className="option-section">
+                            <div className="option-section-header" onClick={() => toggleSection('addOns')}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><span className="section-icon">➕</span> Add-on Decorations</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'addOns')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.addOns !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
+                                <span className={`section-toggle ${expandedSections.addOns ? 'open' : ''}`}>▼</span>
+                            </div>
+                            {expandedSections.addOns && (
+                                <div className="option-section-body">
+                                    <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', margin: '0 0 0.75rem' }}>Select additional decorations (optional)</p>
+                                    <div className="option-grid">
+                                        {ADD_ONS.map(addon => (
+                                            <div
+                                                key={addon.id}
+                                                className={`option-chip ${selectedAddOns.includes(addon.id) ? 'selected' : ''}`}
+                                                onClick={() => toggleAddOn(addon.id)}
+                                            >
+                                                <span>{addon.icon}</span>
+                                                <span>{addon.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {selectedAddOns.length > 0 && (
+                                        <p style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.5rem' }}>
+                                            ✓ {selectedAddOns.length} add-on(s) selected
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        {expandedSections.labelText && (
-                            <div className="option-section-body">
-                                <input
-                                    className="label-text-input"
-                                    type="text"
-                                    placeholder="Enter your custom label text..."
-                                    value={labelText}
-                                    onChange={(e) => setLabelText(e.target.value)}
-                                />
-                                <div className="label-controls">
-                                    <div className="label-control">
-                                        <label>Font</label>
-                                        <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)}>
-                                            {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="label-control">
-                                        <label>Size</label>
-                                        <input type="number" min="8" max="48" value={fontSize} onChange={(e) => setFontSize(parseInt(e.target.value) || 16)} />
-                                    </div>
-                                    <div className="label-control">
-                                        <label>Color</label>
-                                        <input type="color" value={fontColor} onChange={(e) => setFontColor(e.target.value)} />
+                    )}
+
+                    {/* 6C. NAME ON CANDLE - For Square and Special Candles */}
+                    {(isSquareCandle || isSpecialCandle) && (isAdmin || isConfigEnabled('nameOnCandle')) && (isAdmin || visibleSections.nameOnCandle !== false) && (
+                        <div className="option-section">
+                            <div className="option-section-header" onClick={() => toggleSection('nameOnCandle')}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-pen section-icon"></i> Name on Candle</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'nameOnCandle')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.nameOnCandle !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
+                                <span className={`section-toggle ${expandedSections.nameOnCandle ? 'open' : ''}`}>▼</span>
+                            </div>
+                            {expandedSections.nameOnCandle && (
+                                <div className="option-section-body">
+                                    <input
+                                        className="label-text-input"
+                                        type="text"
+                                        placeholder="Enter name to print on candle..."
+                                        value={nameOnCandle}
+                                        onChange={(e) => setNameOnCandle(e.target.value)}
+                                        maxLength={30}
+                                    />
+                                    <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.5rem' }}>
+                                        Max 30 characters. Name will be printed on the candle.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 7. LABEL TEXT */}
+                    {(isAdmin || isConfigEnabled('labelText')) && (isAdmin || visibleSections.labelText !== false) && (
+                        <div className="option-section">
+                            <div className="option-section-header" onClick={() => toggleSection('labelText')}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-pen section-icon"></i> Label Text & Styling</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'labelText')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.labelText !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
+                                </div>
+                                <span className={`section-toggle ${expandedSections.labelText ? 'open' : ''}`}>▼</span>
+                            </div>
+                            {expandedSections.labelText && (
+                                <div className="option-section-body">
+                                    <input
+                                        className="label-text-input"
+                                        type="text"
+                                        placeholder="Enter your custom label text..."
+                                        value={labelText}
+                                        onChange={(e) => setLabelText(e.target.value)}
+                                    />
+                                    <div className="label-controls">
+                                        <div className="label-control">
+                                            <label>Font</label>
+                                            <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)}>
+                                                {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="label-control">
+                                            <label>Size</label>
+                                            <input type="number" min="8" max="48" value={fontSize} onChange={(e) => setFontSize(parseInt(e.target.value) || 16)} />
+                                        </div>
+                                        <div className="label-control">
+                                            <label>Color</label>
+                                            <input type="color" value={fontColor} onChange={(e) => setFontColor(e.target.value)} />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* 8. ARTWORK UPLOAD */}
-                    <div className="option-section">
-                        <div className="option-section-header" onClick={() => toggleSection('artwork')}>
-                            <h3><span className="section-icon">📎</span> Artwork / Branding Upload</h3>
-                            <span className={`section-toggle ${expandedSections.artwork ? 'open' : ''}`}>▼</span>
-                        </div>
-                        {expandedSections.artwork && (
-                            <div className="option-section-body">
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept="image/*,.pdf,.ai,.eps,.svg"
-                                    style={{ display: 'none' }}
-                                    onChange={handleFileUpload}
-                                />
-                                <div className="upload-area" onClick={() => fileInputRef.current?.click()}>
-                                    <span className="upload-icon">☁️</span>
-                                    <p>Click to upload artwork or branding files</p>
-                                    <p className="upload-hint">Supports: PNG, JPG, SVG, PDF, AI, EPS (max 5MB)</p>
+                    {(isAdmin || isConfigEnabled('artwork')) && (isAdmin || visibleSections.artwork !== false) && (
+                        <div className="option-section">
+                            <div className="option-section-header" onClick={() => toggleSection('artwork')}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h3><i className="fas fa-file-upload section-icon"></i> Artwork / Branding Upload</h3>
+                                    {isAdmin && (
+                                        <div onClick={(e) => toggleVisibleSection(e, 'artwork')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Visible: </span>
+                                            <input type="checkbox" checked={visibleSections.artwork !== false} readOnly style={{ transform: 'scale(0.8)', cursor: 'pointer' }} />
+                                        </div>
+                                    )}
                                 </div>
-                                {uploadedFile && (
-                                    <div className="uploaded-file-info">
-                                        <span>📄</span>
-                                        <span className="file-name">{uploadedFile}</span>
-                                        <button className="remove-file" onClick={removeFile}>✕</button>
-                                    </div>
-                                )}
+                                <span className={`section-toggle ${expandedSections.artwork ? 'open' : ''}`}>▼</span>
                             </div>
-                        )}
-                    </div>
+                            {expandedSections.artwork && (
+                                <div className="option-section-body">
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*,.pdf,.ai,.eps,.svg"
+                                        style={{ display: 'none' }}
+                                        onChange={handleFileUpload}
+                                    />
+                                    <div className="upload-area" onClick={() => fileInputRef.current?.click()}>
+                                        <span className="upload-icon">☁️</span>
+                                        <p>Click to upload artwork or branding files</p>
+                                        <p className="upload-hint">Supports: PNG, JPG, SVG, PDF, AI, EPS (max 5MB)</p>
+                                    </div>
+                                    {uploadedFile && (
+                                        <div className="uploaded-file-info">
+                                            <span>📄</span>
+                                            <span className="file-name">{uploadedFile}</span>
+                                            <button className="remove-file" onClick={removeFile}>✕</button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                 </div>
             </div>
@@ -930,17 +1682,65 @@ function ProductConfigurator({ product, onNext, onBack }) {
                         <span className="label">Qty:</span>
                         <span className="value">{quantity}</span>
                     </div>
+                    {isScentedCandle && (
+                        <>
+                            <div className="summary-item">
+                                <span className="label">Glass:</span>
+                                <span className="value">{selectedGlassType}</span>
+                            </div>
+                            <div className="summary-item">
+                                <span className="label">Fragrance:</span>
+                                <span className="value">{selectedFragrance || 'None'}</span>
+                            </div>
+                        </>
+                    )}
+                    {isSquareCandle && (
+                        <>
+                            <div className="summary-item">
+                                <span className="label">Size:</span>
+                                <span className="value">{selectedSquareSize}</span>
+                            </div>
+                            {selectedAddOns.length > 0 && (
+                                <div className="summary-item">
+                                    <span className="label">Add-ons:</span>
+                                    <span className="value">{selectedAddOns.length}</span>
+                                </div>
+                            )}
+                            {nameOnCandle && (
+                                <div className="summary-item">
+                                    <span className="label">Name:</span>
+                                    <span className="value">{nameOnCandle.substring(0, 10)}</span>
+                                </div>
+                            )}
+                        </>
+                    )}
+                    {isSpecialCandle && (
+                        <>
+                            <div className="summary-item">
+                                <span className="label">Type:</span>
+                                <span className="value">{selectedSpecial}</span>
+                            </div>
+                            {selectedAddOns.length > 0 && (
+                                <div className="summary-item">
+                                    <span className="label">Add-ons:</span>
+                                    <span className="value">{selectedAddOns.length}</span>
+                                </div>
+                            )}
+                        </>
+                    )}
                     <div className="summary-item">
-                        <span className="label">Unit Price:</span>
+                        <span className="label">Unit:</span>
                         <span className="value">${pricing.unitPrice}</span>
                     </div>
-                    <div className="summary-item">
-                        <span className="label">MOQ:</span>
-                        <span className="value" style={{ color: moqMet ? '#10b981' : '#ef4444' }}>{currentMOQ} {moqMet ? '✓' : '✗'}</span>
-                    </div>
+                    {isScentedCandle && (
+                        <div className="summary-item">
+                            <span className="label">MOQ:</span>
+                            <span className="value" style={{ color: moqMet ? '#10b981' : '#ef4444' }}>{currentMOQ} {moqMet ? '✓' : '✗'}</span>
+                        </div>
+                    )}
                 </div>
-                <button className="next-btn" disabled={!moqMet} onClick={handleNext}>
-                    Review Order →
+                <button className="next-btn" disabled={!moqMet && isScentedCandle} onClick={handleNext}>
+                    {isAdmin ? 'Done' : 'Review Order →'}
                 </button>
             </div>
         </div>

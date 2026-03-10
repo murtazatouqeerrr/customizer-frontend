@@ -5,7 +5,16 @@ export const PRODUCT_CATEGORIES = {
   SPECIAL_CANDLES: 'special-candles'
 };
 
-// Scented Candles in Glass/Jar
+// Glass Type MOQ configurations
+export const GLASS_TYPE_MOQ = {
+  GL80: { baseMOQ: 1, extraColor: 350, anyColor: 3500, extendedFragrance: 350, customFragrance: 1750 },
+  GL84: { baseMOQ: 1, extraColor: 288, anyColor: 2880, extendedFragrance: 288, customFragrance: 1440 },
+  GL110: { baseMOQ: 1, extraColor: 150, anyColor: 1500, extendedFragrance: 150, customFragrance: 750 },
+  GL140: { baseMOQ: 1, extraColor: 108, anyColor: 1080, extendedFragrance: 108, customFragrance: 540 },
+  GL170: { baseMOQ: 1, extraColor: 60, anyColor: 600, extendedFragrance: 60, customFragrance: 300 },
+};
+
+// Scented Candles in Glass/Jar - 12 colors, 18+ fragrances
 export const SCENTED_CANDLES = [
   {
     id: 'GL80',
@@ -14,9 +23,8 @@ export const SCENTED_CANDLES = [
     category: PRODUCT_CATEGORIES.SCENTED_CANDLES,
     moq: {
       glassColor: {
-        standard: { moq: 1, colors: ['White matt', 'Black matt'] },
-        extra: { moq: 350, count: 2 },
-        any: { moq: 3500 }
+        standard: { moq: 1, colors: ['Ivory', 'Black matt'] },
+        extra: { moq: 350, count: 10 },
       },
       fragrance: {
         standard: { moq: 1, options: ['floral', 'woody', 'fresh', 'spicy', 'sandalwood'] },
@@ -47,9 +55,8 @@ export const SCENTED_CANDLES = [
     category: PRODUCT_CATEGORIES.SCENTED_CANDLES,
     moq: {
       glassColor: {
-        standard: { moq: 1, colors: ['White matt', 'Black matt'] },
-        extra: { moq: 288, count: 2 },
-        any: { moq: 2880 }
+        standard: { moq: 1, colors: ['Ivory', 'Black matt'] },
+        extra: { moq: 288, count: 10 },
       },
       fragrance: {
         standard: { moq: 1, options: ['floral', 'woody', 'fresh', 'spicy', 'sandalwood'] },
@@ -80,9 +87,8 @@ export const SCENTED_CANDLES = [
     category: PRODUCT_CATEGORIES.SCENTED_CANDLES,
     moq: {
       glassColor: {
-        standard: { moq: 1, colors: ['White matt', 'Black matt'] },
-        extra: { moq: 150, count: 2 },
-        any: { moq: 1500 }
+        standard: { moq: 1, colors: ['Ivory', 'Black matt'] },
+        extra: { moq: 150, count: 10 },
       },
       fragrance: {
         standard: { moq: 1, options: ['floral', 'woody', 'fresh', 'spicy', 'sandalwood'] },
@@ -113,9 +119,8 @@ export const SCENTED_CANDLES = [
     category: PRODUCT_CATEGORIES.SCENTED_CANDLES,
     moq: {
       glassColor: {
-        standard: { moq: 1, colors: ['White matt', 'Black matt'] },
-        extra: { moq: 108, count: 2 },
-        any: { moq: 1080 }
+        standard: { moq: 1, colors: ['Ivory', 'Black matt'] },
+        extra: { moq: 108, count: 10 },
       },
       fragrance: {
         standard: { moq: 1, options: ['floral', 'woody', 'fresh', 'spicy', 'sandalwood'] },
@@ -146,9 +151,8 @@ export const SCENTED_CANDLES = [
     category: PRODUCT_CATEGORIES.SCENTED_CANDLES,
     moq: {
       glassColor: {
-        standard: { moq: 1, colors: ['White matt', 'Black matt'] },
-        extra: { moq: 60, count: 2 },
-        any: { moq: 600 }
+        standard: { moq: 1, colors: ['Ivory', 'Black matt'] },
+        extra: { moq: 60, count: 10 },
       },
       fragrance: {
         standard: { moq: 1, options: ['floral', 'woody', 'fresh', 'spicy', 'sandalwood'] },
