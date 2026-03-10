@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ProductConfigurator, { CUSTOMIZATION_FIELDS } from './ProductConfigurator';
+import MOQEditor from './MOQEditor';
 import './AdminDashboard.css';
 
 const API_URL = 'https://customizer-backend-lxfe.onrender.com/api';
@@ -15,6 +16,7 @@ const FIELD_CATEGORIES = {
 };
 
 function AdminDashboard() {
+    const [activeTab, setActiveTab] = useState('models');
     const [models, setModels] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedModel, setSelectedModel] = useState(null);
@@ -156,6 +158,9 @@ function AdminDashboard() {
                     </div>
                 </div>
                 <div className="admin-header-right">
+                    <a href="/admin/moq" className="moq-settings-btn">
+                        📊 MOQ Settings
+                    </a>
                     <a href="/" className="view-store-btn" target="_blank" rel="noreferrer">
                         <i className="fas fa-store"></i> View Store
                     </a>

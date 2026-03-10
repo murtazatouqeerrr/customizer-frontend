@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import AdminDashboard from './components/AdminDashboard';
+import AdminMOQ from './components/AdminMOQ';
 import UserDashboard from './components/UserDashboard';
 import UserCustomizer from './components/UserCustomizer';
 import ProductConfigurator from './components/ProductConfigurator';
@@ -61,8 +62,9 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Admin dashboard */}
-        <Route path="/admin/*" element={<AdminDashboard />} />
+        {/* Admin routes */}
+        <Route path="/admin/moq" element={<AdminMOQ />} />
+        <Route path="/admin" element={<AdminDashboard />} />
 
         {/* User-facing storefront */}
         <Route path="/*" element={<UserApp />} />
