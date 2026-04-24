@@ -1364,7 +1364,7 @@ function ProductConfigurator({ product, onNext, onBack, isAdmin }) {
           )}
 
           {/* Customizable Area Configuration (Admin only) */}
-          {isAdmin && (
+          {/* {isAdmin && (
             <div className="option-section">
               <div
                 className="option-section-header"
@@ -1386,15 +1386,6 @@ function ProductConfigurator({ product, onNext, onBack, isAdmin }) {
                       marginLeft: "12px",
                     }}
                   >
-                    <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
-                      Visible:{" "}
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={visibleSections.customizableArea !== false}
-                      readOnly
-                      style={{ transform: "scale(0.8)", cursor: "pointer" }}
-                    />
                   </div>
                 </div>
                 <span
@@ -1470,7 +1461,7 @@ function ProductConfigurator({ product, onNext, onBack, isAdmin }) {
                 </div>
               )}
             </div>
-          )}
+          )} */}
 
           {/* 0. BASE IMAGE UPLOAD */}
           {(isAdmin || isConfigEnabled("baseImage")) &&
@@ -1500,17 +1491,7 @@ function ProductConfigurator({ product, onNext, onBack, isAdmin }) {
                           gap: "6px",
                           marginLeft: "12px",
                         }}
-                      >
-                        <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
-                          Visible:{" "}
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={visibleSections.baseImage !== false}
-                          readOnly
-                          style={{ transform: "scale(0.8)", cursor: "pointer" }}
-                        />
-                      </div>
+                      ></div>
                     )}
                   </div>
                   <span
