@@ -115,7 +115,7 @@ function UserCustomizer({ product, onBack }) {
             <div className="uc-top-bar">
                 <button className="uc-back-btn" onClick={onBack}>← Back</button>
                 <h2 className="uc-product-name">{product.name}</h2>
-                <div className="uc-price">Rs. {parseFloat(product.base_price || 0).toFixed(2)} / unit</div>
+                <div className="uc-price">$ {parseFloat(product.base_price || 0).toFixed(2)} / unit</div>
             </div>
 
             {loading ? (

@@ -1385,8 +1385,7 @@ function ProductConfigurator({ product, onNext, onBack, isAdmin }) {
                       gap: "6px",
                       marginLeft: "12px",
                     }}
-                  >
-                  </div>
+                  ></div>
                 </div>
                 <span
                   className={`section-toggle ${expandedSections.customizableArea ? "open" : ""}`}

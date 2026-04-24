@@ -76,7 +76,7 @@ function UserDashboard({ onSelectProduct }) {
                                     {product.description && <p className="user-card-desc">{product.description}</p>}
                                     <div className="user-card-footer">
                                         <span className="user-card-price">
-                                            Rs. {parseFloat(product.base_price || 0).toFixed(2)}
+                                            $ {parseFloat(product.base_price || 0).toFixed(2)}
                                         </span>
                                         <button className="customize-btn" onClick={() => onSelectProduct(product)}>
                                             Customize
