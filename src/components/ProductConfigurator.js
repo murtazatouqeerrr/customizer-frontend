@@ -1364,7 +1364,7 @@ function ProductConfigurator({ product, onNext, onBack, isAdmin }) {
           )}
 
           {/* Customizable Area Configuration (Admin only) */}
-          {/* {isAdmin && (
+          {isAdmin && (
             <div className="option-section">
               <div
                 className="option-section-header"
@@ -1461,7 +1461,7 @@ function ProductConfigurator({ product, onNext, onBack, isAdmin }) {
                 </div>
               )}
             </div>
-          )} */}
+          )}
 
           {/* 0. BASE IMAGE UPLOAD */}
           {(isAdmin || isConfigEnabled("baseImage")) &&
